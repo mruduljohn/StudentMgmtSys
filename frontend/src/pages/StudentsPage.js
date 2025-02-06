@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Container, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid2 as Grid, CircularProgress } from '@mui/material';
+import { Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Container, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid2 as Grid, CircularProgress, Snackbar, Alert, Select, MenuItem } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { getStudents, createStudent, updateStudent, deleteStudent, uploadExcel, downloadExcel } from '../services/api';
+import { getStudents, createStudent, updateStudent, deleteStudent, uploadExcel, downloadExcel, getConfigurableOptions } from '../services/api';
 import { AuthContext } from '../utils/AuthContext';
 
 const StudentsPage = () => {
@@ -9,7 +9,6 @@ const StudentsPage = () => {
     const [open, setOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
     const [formData, setFormData] = useState({
-        sl_no: '',
         name: '',
         student_id: '',
         phone_number: '',
@@ -23,22 +22,29 @@ const StudentsPage = () => {
         uniform: '',
         id_card: '',
         tab: '',
-        joined: '',
+        joined_status: '',
         syllabus: '',
-        percentage_of_2_marks: '',
+        plus_two_percentage: '',
         neet_score: '',
         remarks: '',
-        remarks_1: '',
-        remarks_2: '',
-        remarks_3: '',
-        remarks_4: '',
+        remarks1: '',
+        remarks2: '',
+        remarks3: '',
+        remarks4: '',
         fee_due: '',
-        flag1: '',
-        flag2: '',
-        flag3: '',
-        flag4: '',
+        flag1: false,
+        flag2: false,
+        flag3: false,
+        flag4: false,
     });
     const [loading, setLoading] = useState(false);
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [snackbarMessage, setSnackbarMessage] = useState('');
+    const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+    const [batches, setBatches] = useState([]);
+    const [hostels, setHostels] = useState([]);
+    const [programs, setPrograms] = useState([]);
+    const [classTeachers, setClassTeachers] = useState([]);
     const navigate = useNavigate();
     const { authState } = React.useContext(AuthContext);
 
@@ -47,6 +53,7 @@ const StudentsPage = () => {
             navigate('/login');
         } else {
             fetchStudents();
+            fetchConfigurableOptions();
         }
     }, [authState.isAuthenticated, navigate]);
 
@@ -56,11 +63,39 @@ const StudentsPage = () => {
             setStudents(response.data);
         } catch (error) {
             console.error('Failed to fetch students:', error);
+            setSnackbarMessage('Failed to fetch students');
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
+        }
+    };
+
+    const fetchConfigurableOptions = async () => {
+        try {
+            const batchResponse = await getConfigurableOptions('BATCH');
+            setBatches(batchResponse.data);
+
+            const hostelResponse = await getConfigurableOptions('HOSTEL');
+            setHostels(hostelResponse.data);
+
+            const programResponse = await getConfigurableOptions('PROGRAM');
+            setPrograms(programResponse.data);
+
+            const classTeacherResponse = await getConfigurableOptions('CLASS_TEACHER');
+            setClassTeachers(classTeacherResponse.data);
+        } catch (error) {
+            console.error('Failed to fetch configurable options:', error);
+            setSnackbarMessage('Failed to fetch configurable options');
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
         }
     };
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value, type, checked } = e.target;
+        setFormData({
+            ...formData,
+            [name]: type === 'checkbox' ? checked : value,
+        });
     };
 
     const handleOpen = (student) => {
@@ -72,7 +107,6 @@ const StudentsPage = () => {
     const handleClose = () => {
         setEditingStudent(null);
         setFormData({
-            sl_no: '',
             name: '',
             student_id: '',
             phone_number: '',
@@ -86,20 +120,20 @@ const StudentsPage = () => {
             uniform: '',
             id_card: '',
             tab: '',
-            joined: '',
+            joined_status: '',
             syllabus: '',
-            percentage_of_2_marks: '',
+            plus_two_percentage: '',
             neet_score: '',
             remarks: '',
-            remarks_1: '',
-            remarks_2: '',
-            remarks_3: '',
-            remarks_4: '',
+            remarks1: '',
+            remarks2: '',
+            remarks3: '',
+            remarks4: '',
             fee_due: '',
-            flag1: '',
-            flag2: '',
-            flag3: '',
-            flag4: '',
+            flag1: false,
+            flag2: false,
+            flag3: false,
+            flag4: false,
         });
         setOpen(false);
     };
@@ -114,8 +148,14 @@ const StudentsPage = () => {
             }
             handleClose();
             fetchStudents();
+            setSnackbarMessage(`${editingStudent ? 'Updated' : 'Added'} student successfully`);
+            setSnackbarSeverity('success');
+            setSnackbarOpen(true);
         } catch (error) {
             console.error('Failed to submit student:', error);
+            setSnackbarMessage('Failed to submit student');
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
         }
     };
 
@@ -123,8 +163,14 @@ const StudentsPage = () => {
         try {
             await deleteStudent(id);
             fetchStudents();
+            setSnackbarMessage('Deleted student successfully');
+            setSnackbarSeverity('success');
+            setSnackbarOpen(true);
         } catch (error) {
             console.error('Failed to delete student:', error);
+            setSnackbarMessage('Failed to delete student');
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
         }
     };
 
@@ -142,8 +188,14 @@ const StudentsPage = () => {
             setLoading(true);
             await uploadExcel(formData);
             fetchStudents();
+            setSnackbarMessage('Students imported successfully');
+            setSnackbarSeverity('success');
+            setSnackbarOpen(true);
         } catch (error) {
             console.error('Failed to upload Excel file:', error);
+            setSnackbarMessage('Failed to upload Excel file');
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
         } finally {
             setLoading(false);
         }
@@ -159,11 +211,24 @@ const StudentsPage = () => {
             link.setAttribute('download', 'students.xlsx');
             document.body.appendChild(link);
             link.click();
+            setSnackbarMessage('Students exported successfully');
+            setSnackbarSeverity('success');
+            setSnackbarOpen(true);
         } catch (error) {
             console.error('Failed to download Excel file:', error);
+            setSnackbarMessage('Failed to download Excel file');
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSnackbarClose = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbarOpen(false);
     };
 
     return (
@@ -198,6 +263,12 @@ const StudentsPage = () => {
                             <TableCell>Name</TableCell>
                             <TableCell>Student ID</TableCell>
                             <TableCell>Phone Number</TableCell>
+                            <TableCell>Gender</TableCell>
+                            <TableCell>Batch</TableCell>
+                            <TableCell>Class Teacher</TableCell>
+                            <TableCell>Hostel</TableCell>
+                            <TableCell>Stream</TableCell>
+                            <TableCell>Program</TableCell>
                             <TableCell>Actions</TableCell>
                         </TableRow>
                     </TableHead>
@@ -208,6 +279,12 @@ const StudentsPage = () => {
                                 <TableCell>{student.name}</TableCell>
                                 <TableCell>{student.student_id}</TableCell>
                                 <TableCell>{student.phone_number}</TableCell>
+                                <TableCell>{student.gender}</TableCell>
+                                <TableCell>{student.batch}</TableCell>
+                                <TableCell>{student.class_teacher}</TableCell>
+                                <TableCell>{student.hostel}</TableCell>
+                                <TableCell>{student.stream}</TableCell>
+                                <TableCell>{student.program}</TableCell>
                                 <TableCell>
                                     <Button variant="outlined" color="primary" onClick={() => handleOpen(student)}>
                                         Edit
@@ -227,17 +304,6 @@ const StudentsPage = () => {
                 <DialogContent>
                     <form onSubmit={handleSubmit}>
                         <Grid container spacing={2}>
-                            <Grid item xs={12}>
-                                <TextField
-                                    variant="outlined"
-                                    required
-                                    fullWidth
-                                    label="Sl No"
-                                    name="sl_no"
-                                    value={formData.sl_no}
-                                    onChange={handleChange}
-                                />
-                            </Grid>
                             <Grid item xs={12}>
                                 <TextField
                                     variant="outlined"
@@ -280,7 +346,12 @@ const StudentsPage = () => {
                                     name="gender"
                                     value={formData.gender}
                                     onChange={handleChange}
-                                />
+                                    select
+                                >
+                                    <MenuItem value="MALE">MALE</MenuItem>
+                                    <MenuItem value="FEMALE">FEMALE</MenuItem>
+                                    <MenuItem value="DIFFERENT">DIFFERENT</MenuItem>
+                                </TextField>
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
@@ -291,7 +362,14 @@ const StudentsPage = () => {
                                     name="batch"
                                     value={formData.batch}
                                     onChange={handleChange}
-                                />
+                                    select
+                                >
+                                    {batches.map((batch) => (
+                                        <MenuItem key={batch.id} value={batch.value}>
+                                            {batch.value}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
@@ -302,7 +380,14 @@ const StudentsPage = () => {
                                     name="class_teacher"
                                     value={formData.class_teacher}
                                     onChange={handleChange}
-                                />
+                                    select
+                                >
+                                    {classTeachers.map((teacher) => (
+                                        <MenuItem key={teacher.id} value={teacher.value}>
+                                            {teacher.value}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
@@ -313,7 +398,14 @@ const StudentsPage = () => {
                                     name="hostel"
                                     value={formData.hostel}
                                     onChange={handleChange}
-                                />
+                                    select
+                                >
+                                    {hostels.map((hostel) => (
+                                        <MenuItem key={hostel.id} value={hostel.value}>
+                                            {hostel.value}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
@@ -324,7 +416,12 @@ const StudentsPage = () => {
                                     name="stream"
                                     value={formData.stream}
                                     onChange={handleChange}
-                                />
+                                    select
+                                >
+                                    <MenuItem value="MEDICAL">MEDICAL</MenuItem>
+                                    <MenuItem value="ENGINEERING">ENGINEERING</MenuItem>
+                                    <MenuItem value="FOUNDATION">FOUNDATION</MenuItem>
+                                </TextField>
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
@@ -335,7 +432,14 @@ const StudentsPage = () => {
                                     name="program"
                                     value={formData.program}
                                     onChange={handleChange}
-                                />
+                                    select
+                                >
+                                    {programs.map((program) => (
+                                        <MenuItem key={program.id} value={program.value}>
+                                            {program.value}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
@@ -382,11 +486,18 @@ const StudentsPage = () => {
                                     variant="outlined"
                                     required
                                     fullWidth
-                                    label="Joined"
-                                    name="joined"
-                                    value={formData.joined}
+                                    label="Joined Status"
+                                    name="joined_status"
+                                    value={formData.joined_status}
                                     onChange={handleChange}
-                                />
+                                    select
+                                >
+                                    <MenuItem value="ALLOTED">ALLOTED</MenuItem>
+                                    <MenuItem value="JOINING SOON">JOINING SOON</MenuItem>
+                                    <MenuItem value="JOINED">JOINED</MenuItem>
+                                    <MenuItem value="NOT JOINING">NOT JOINING</MenuItem>
+                                    <MenuItem value="VACATED">VACATED</MenuItem>
+                                </TextField>
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
@@ -397,7 +508,13 @@ const StudentsPage = () => {
                                     name="syllabus"
                                     value={formData.syllabus}
                                     onChange={handleChange}
-                                />
+                                    select
+                                >
+                                    <MenuItem value="STATE">STATE</MenuItem>
+                                    <MenuItem value="CBSE">CBSE</MenuItem>
+                                    <MenuItem value="ICSC">ICSC</MenuItem>
+                                    <MenuItem value="OTHERS">OTHERS</MenuItem>
+                                </TextField>
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
@@ -405,10 +522,18 @@ const StudentsPage = () => {
                                     required
                                     fullWidth
                                     label="Percentage of +2 Marks"
-                                    name="percentage_of_2_marks"
-                                    type="number"
-                                    value={formData.percentage_of_2_marks}
+                                    name="plus_two_percentage"
+                                    value={formData.plus_two_percentage}
                                     onChange={handleChange}
+                                    type="number"
+                                    InputLabelProps={{
+                                        shrink: true,
+                                    }}
+                                    inputProps={{
+                                        min: 0,
+                                        max: 100,
+                                        step: 0.01,
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12}>
@@ -416,11 +541,18 @@ const StudentsPage = () => {
                                     variant="outlined"
                                     required
                                     fullWidth
-                                    label="NEET Score"
+                                    label="NEET/JEE Score"
                                     name="neet_score"
-                                    type="number"
                                     value={formData.neet_score}
                                     onChange={handleChange}
+                                    type="number"
+                                    InputLabelProps={{
+                                        shrink: true,
+                                    }}
+                                    inputProps={{
+                                        min: 0,
+                                        max: 720,
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12}>
@@ -438,8 +570,8 @@ const StudentsPage = () => {
                                     variant="outlined"
                                     fullWidth
                                     label="Remarks 1"
-                                    name="remarks_1"
-                                    value={formData.remarks_1}
+                                    name="remarks1"
+                                    value={formData.remarks1}
                                     onChange={handleChange}
                                 />
                             </Grid>
@@ -448,8 +580,8 @@ const StudentsPage = () => {
                                     variant="outlined"
                                     fullWidth
                                     label="Remarks 2"
-                                    name="remarks_2"
-                                    value={formData.remarks_2}
+                                    name="remarks2"
+                                    value={formData.remarks2}
                                     onChange={handleChange}
                                 />
                             </Grid>
@@ -458,8 +590,8 @@ const StudentsPage = () => {
                                     variant="outlined"
                                     fullWidth
                                     label="Remarks 3"
-                                    name="remarks_3"
-                                    value={formData.remarks_3}
+                                    name="remarks3"
+                                    value={formData.remarks3}
                                     onChange={handleChange}
                                 />
                             </Grid>
@@ -468,8 +600,8 @@ const StudentsPage = () => {
                                     variant="outlined"
                                     fullWidth
                                     label="Remarks 4"
-                                    name="remarks_4"
-                                    value={formData.remarks_4}
+                                    name="remarks4"
+                                    value={formData.remarks4}
                                     onChange={handleChange}
                                 />
                             </Grid>
@@ -479,49 +611,59 @@ const StudentsPage = () => {
                                     fullWidth
                                     label="Fee Due"
                                     name="fee_due"
-                                    type="number"
                                     value={formData.fee_due}
                                     onChange={handleChange}
+                                    type="number"
+                                    InputLabelProps={{
+                                        shrink: true,
+                                    }}
+                                    inputProps={{
+                                        min: 0,
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
                                     variant="outlined"
                                     fullWidth
-                                    label="Flag1"
+                                    label="Flag 1"
                                     name="flag1"
-                                    value={formData.flag1}
+                                    checked={formData.flag1}
                                     onChange={handleChange}
+                                    type="checkbox"
                                 />
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
                                     variant="outlined"
                                     fullWidth
-                                    label="Flag2"
+                                    label="Flag 2"
                                     name="flag2"
-                                    value={formData.flag2}
+                                    checked={formData.flag2}
                                     onChange={handleChange}
+                                    type="checkbox"
                                 />
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
                                     variant="outlined"
                                     fullWidth
-                                    label="Flag3"
+                                    label="Flag 3"
                                     name="flag3"
-                                    value={formData.flag3}
+                                    checked={formData.flag3}
                                     onChange={handleChange}
+                                    type="checkbox"
                                 />
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField
                                     variant="outlined"
                                     fullWidth
-                                    label="Flag4"
+                                    label="Flag 4"
                                     name="flag4"
-                                    value={formData.flag4}
+                                    checked={formData.flag4}
                                     onChange={handleChange}
+                                    type="checkbox"
                                 />
                             </Grid>
                         </Grid>
@@ -536,6 +678,12 @@ const StudentsPage = () => {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
+                <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+                    {snackbarMessage}
+                </Alert>
+            </Snackbar>
         </Container>
     );
 };

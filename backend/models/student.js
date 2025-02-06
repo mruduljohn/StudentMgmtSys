@@ -10,9 +10,8 @@ const getStudentById = async (id) => {
 
 const createStudent = async (studentData) => {
     return pool.query(
-        'INSERT INTO students (sl_no, name, student_id, phone_number, gender, batch, class_teacher, hostel, stream, program, study_material, uniform, id_card, tab, joined, syllabus, percentage_of_2_marks, neet_score, remarks, remarks_1, remarks_2, remarks_3, remarks_4, fee_due, flag1, flag2, flag3, flag4) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28) RETURNING *',
+        'INSERT INTO students (name, student_id, phone_number, gender, batch, class_teacher, hostel, stream, program, study_material, uniform, id_card, tab, joined_status, syllabus, plus_two_percentage, neet_score, remarks, remarks1, remarks2, remarks3, remarks4, fee_due, flag1, flag2, flag3, flag4, created_by, modified_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27) RETURNING *',
         [
-            studentData.sl_no,
             studentData.name,
             studentData.student_id,
             studentData.phone_number,
@@ -26,29 +25,30 @@ const createStudent = async (studentData) => {
             studentData.uniform,
             studentData.id_card,
             studentData.tab,
-            studentData.joined,
+            studentData.joined_status,
             studentData.syllabus,
-            studentData.percentage_of_2_marks,
+            studentData.plus_two_percentage,
             studentData.neet_score,
             studentData.remarks,
-            studentData.remarks_1,
-            studentData.remarks_2,
-            studentData.remarks_3,
-            studentData.remarks_4,
+            studentData.remarks1,
+            studentData.remarks2,
+            studentData.remarks3,
+            studentData.remarks4,
             studentData.fee_due,
             studentData.flag1,
             studentData.flag2,
             studentData.flag3,
             studentData.flag4,
+            req.user.id,
+            req.user.id,
         ]
     );
 };
 
 const updateStudent = async (id, studentData) => {
     return pool.query(
-        'UPDATE students SET sl_no = $1, name = $2, student_id = $3, phone_number = $4, gender = $5, batch = $6, class_teacher = $7, hostel = $8, stream = $9, program = $10, study_material = $11, uniform = $12, id_card = $13, tab = $14, joined = $15, syllabus = $16, percentage_of_2_marks = $17, neet_score = $18, remarks = $19, remarks_1 = $20, remarks_2 = $21, remarks_3 = $22, remarks_4 = $23, fee_due = $24, flag1 = $25, flag2 = $26, flag3 = $27, flag4 = $28 WHERE id = $29 RETURNING *',
+        'UPDATE students SET name = $1, student_id = $2, phone_number = $3, gender = $4, batch = $5, class_teacher = $6, hostel = $7, stream = $8, program = $9, study_material = $10, uniform = $11, id_card = $12, tab = $13, joined_status = $14, syllabus = $15, plus_two_percentage = $16, neet_score = $17, remarks = $18, remarks1 = $19, remarks2 = $20, remarks3 = $21, remarks4 = $22, fee_due = $23, flag1 = $24, flag2 = $25, flag3 = $26, flag4 = $27, modified_at = CURRENT_TIMESTAMP, modified_by = $28 WHERE id = $29 RETURNING *',
         [
-            studentData.sl_no,
             studentData.name,
             studentData.student_id,
             studentData.phone_number,
@@ -62,20 +62,21 @@ const updateStudent = async (id, studentData) => {
             studentData.uniform,
             studentData.id_card,
             studentData.tab,
-            studentData.joined,
+            studentData.joined_status,
             studentData.syllabus,
-            studentData.percentage_of_2_marks,
+            studentData.plus_two_percentage,
             studentData.neet_score,
             studentData.remarks,
-            studentData.remarks_1,
-            studentData.remarks_2,
-            studentData.remarks_3,
-            studentData.remarks_4,
+            studentData.remarks1,
+            studentData.remarks2,
+            studentData.remarks3,
+            studentData.remarks4,
             studentData.fee_due,
             studentData.flag1,
             studentData.flag2,
             studentData.flag3,
             studentData.flag4,
+            req.user.id,
             id,
         ]
     );

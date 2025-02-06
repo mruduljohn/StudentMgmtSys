@@ -1,10 +1,10 @@
-const { createUser, getUserByUsername } = require('../models/user');
+const { createUser, getUserByUsername, updateUserLastLogin } = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const register = async (req, res) => {
     try {
-        const { username, password, role } = req.body;
+        const { username, password, role, email } = req.body;
         console.log('Registering user:', username, role); // Debug log
 
         const existingUser = await getUserByUsername(username);
@@ -14,7 +14,7 @@ const register = async (req, res) => {
             return res.status(400).json({ message: 'Username already exists' });
         }
 
-        const result = await createUser(username, password, role);
+        const result = await createUser(username, password, role, email);
         console.log('User created:', result.rows); // Debug log
 
         res.status(201).json({ message: 'User registered successfully' });
@@ -36,12 +36,14 @@ const login = async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        const validPassword = await bcrypt.compare(password, user.rows[0].password);
+        const validPassword = await bcrypt.compare(password, user.rows[0].password_hash);
         console.log('Password valid:', validPassword); // Debug log
 
         if (!validPassword) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
+
+        await updateUserLastLogin(user.rows[0].id);
 
         const token = jwt.sign({ id: user.rows[0].id, role: user.rows[0].role }, process.env.SECRET_KEY, { expiresIn: '1h' });
         console.log('Token generated:', token); // Debug log

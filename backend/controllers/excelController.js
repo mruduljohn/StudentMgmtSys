@@ -16,19 +16,23 @@ const uploadExcel = async (req, res) => {
         const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]]);
 
         for (const row of data) {
+            const batch = await pool.query('SELECT id FROM configurable_options WHERE category = $1 AND value = $2 AND is_active = true', ['BATCH', row.BATCH]);
+            const classTeacher = await pool.query('SELECT id FROM configurable_options WHERE category = $1 AND value = $2 AND is_active = true', ['CLASS_TEACHER', row['CLASS TEACHER']]);
+            const hostel = await pool.query('SELECT id FROM configurable_options WHERE category = $1 AND value = $2 AND is_active = true', ['HOSTEL', row.HOSTEL]);
+            const program = await pool.query('SELECT id FROM configurable_options WHERE category = $1 AND value = $2 AND is_active = true', ['PROGRAM', row.PROGRAM]);
+
             await pool.query(
-                'INSERT INTO students (sl_no, name, student_id, phone_number, gender, batch, class_teacher, hostel, stream, program, study_material, uniform, id_card, tab, joined, syllabus, percentage_of_2_marks, neet_score, remarks, remarks_1, remarks_2, remarks_3, remarks_4, fee_due, flag1, flag2, flag3, flag4) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28) ON CONFLICT (student_id) DO NOTHING',
+                'INSERT INTO students (name, student_id, phone_number, gender, batch, class_teacher, hostel, stream, program, study_material, uniform, id_card, tab, joined_status, syllabus, plus_two_percentage, neet_score, remarks, remarks1, remarks2, remarks3, remarks4, fee_due, flag1, flag2, flag3, flag4, created_by, modified_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27) ON CONFLICT (student_id) DO NOTHING',
                 [
-                    row.sl_no,
                     row.NAME,
                     row['STUDENT ID'],
                     row['PHONE NUMBER'],
                     row.GENDER,
-                    row.BATCH,
-                    row['CLASS TEACHER'],
-                    row.HOSTEL,
+                    batch.rows[0]?.id,
+                    classTeacher.rows[0]?.id,
+                    hostel.rows[0]?.id,
                     row.STREAM,
-                    row.PROGRAM,
+                    program.rows[0]?.id,
                     row['Study Material'],
                     row.Uniform,
                     row['ID Card'],
@@ -47,6 +51,8 @@ const uploadExcel = async (req, res) => {
                     row.Flag2,
                     row.Flag3,
                     row.Flag4,
+                    req.user.id,
+                    req.user.id,
                 ]
             );
         }
