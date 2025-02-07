@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Container, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid2 as Grid, CircularProgress, Snackbar, Alert, Select, MenuItem } from '@mui/material';
+import { Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Container, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid2 as Grid, CircularProgress, Snackbar, Alert, Select, MenuItem, TableSortLabel, TablePagination } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { getActiveBatches, createBatch, updateBatch, deleteBatch, getConfigurableOptions } from '../services/api';
 import { AuthContext } from '../utils/AuthContext';
@@ -21,6 +21,12 @@ const BatchesPage = () => {
     const [snackbarSeverity, setSnackbarSeverity] = useState('success');
     const [programs, setPrograms] = useState([]);
     const [classTeachers, setClassTeachers] = useState([]);
+    const [order, setOrder] = useState('asc');
+    const [orderBy, setOrderBy] = useState('batch_id');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(100);
+    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+    const [deleteBatchId, setDeleteBatchId] = useState(null);
     const navigate = useNavigate();
     const { authState } = React.useContext(AuthContext);
 
@@ -118,6 +124,64 @@ const BatchesPage = () => {
         }
     };
 
+    const handleRequestSort = (property) => {
+        const isAsc = orderBy === property && order === 'asc';
+        setOrder(isAsc ? 'desc' : 'asc');
+        setOrderBy(property);
+    };
+
+    const stableSort = (array, comparator) => {
+        const stabilizedThis = array.map((el, index) => [el, index]);
+        stabilizedThis.sort((a, b) => {
+            const order = comparator(a[0], b[0]);
+            if (order !== 0) return order;
+            return a[1] - b[1];
+        });
+        return stabilizedThis.map((el) => el[0]);
+    };
+
+    const descendingComparator = (a, b, orderBy) => {
+        if (b[orderBy] < a[orderBy]) {
+            return -1;
+        }
+        if (b[orderBy] > a[orderBy]) {
+            return 1;
+        }
+        return 0;
+    };
+
+    const getComparator = (order, orderBy) => {
+        return order === 'desc'
+            ? (a, b) => descendingComparator(a, b, orderBy)
+            : (a, b) => -descendingComparator(a, b, orderBy);
+    };
+
+    const handlePageChange = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleRowsPerPageChange = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
+    const handleConfirmDeleteOpen = (id) => {
+        setDeleteBatchId(id);
+        setConfirmDeleteOpen(true);
+    };
+
+    const handleConfirmDeleteClose = () => {
+        setDeleteBatchId(null);
+        setConfirmDeleteOpen(false);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (deleteBatchId) {
+            await handleDelete(deleteBatchId);
+        }
+        handleConfirmDeleteClose();
+    };
+
     const handleSnackbarClose = (event, reason) => {
         if (reason === 'clickaway') {
             return;
@@ -138,39 +202,88 @@ const BatchesPage = () => {
                 <Table>
                     <TableHead>
                         <TableRow>
-                            <TableCell>ID</TableCell>
-                            <TableCell>Batch ID</TableCell>
-                            <TableCell>Strength</TableCell>
-                            <TableCell>Stream</TableCell>
-                            <TableCell>Program</TableCell>
-                            <TableCell>Class Teacher</TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'batch_id'}
+                                    direction={orderBy === 'batch_id' ? order : 'asc'}
+                                    onClick={() => handleRequestSort('batch_id')}
+                                >
+                                    Batch ID
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'strength'}
+                                    direction={orderBy === 'strength' ? order : 'asc'}
+                                    onClick={() => handleRequestSort('strength')}
+                                >
+                                    Strength
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'stream'}
+                                    direction={orderBy === 'stream' ? order : 'asc'}
+                                    onClick={() => handleRequestSort('stream')}
+                                >
+                                    Stream
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'program'}
+                                    direction={orderBy === 'program' ? order : 'asc'}
+                                    onClick={() => handleRequestSort('program')}
+                                >
+                                    Program
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'class_teacher'}
+                                    direction={orderBy === 'class_teacher' ? order : 'asc'}
+                                    onClick={() => handleRequestSort('class_teacher')}
+                                >
+                                    Class Teacher
+                                </TableSortLabel>
+                            </TableCell>
                             <TableCell>Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {batches.map((batch) => (
-                            <TableRow key={batch.id}>
-                                <TableCell>{batch.id}</TableCell>
-                                <TableCell>{batch.batch_id}</TableCell>
-                                <TableCell>{batch.strength}</TableCell>
-                                <TableCell>{batch.stream}</TableCell>
-                                <TableCell>{batch.program}</TableCell>
-                                <TableCell>{batch.class_teacher}</TableCell>
-                                <TableCell>
-                                    <Button variant="outlined" color="primary" onClick={() => handleOpen(batch)}>
-                                        Edit
-                                    </Button>
-                                    <Button variant="outlined" color="secondary" onClick={() => handleDelete(batch.id)}>
-                                        Delete
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                        {stableSort(batches, getComparator(order, orderBy))
+                            .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                            .map((batch) => (
+                                <TableRow key={batch.id}>
+                                    <TableCell>{batch.batch_id}</TableCell>
+                                    <TableCell>{batch.strength}</TableCell>
+                                    <TableCell>{batch.stream}</TableCell>
+                                    <TableCell>{batch.program}</TableCell>
+                                    <TableCell>{batch.class_teacher}</TableCell>
+                                    <TableCell>
+                                        <Button variant="outlined" color="primary" onClick={() => handleOpen(batch)}>
+                                            Edit
+                                        </Button>
+                                        <Button variant="outlined" color="secondary" onClick={() => handleConfirmDeleteOpen(batch.id)}>
+                                            Delete
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
                     </TableBody>
                 </Table>
             </TableContainer>
+            <TablePagination
+                rowsPerPageOptions={[100]}
+                component="div"
+                count={batches.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handlePageChange}
+                onRowsPerPageChange={handleRowsPerPageChange}
+            />
 
-            <Dialog open={open} onClose={handleClose} aria-labelledby="form-dialog-title">
+            <Dialog open={open} onClose={handleClose} aria-labelledby="form-dialog-title" fullWidth maxWidth="sm">
                 <DialogTitle id="form-dialog-title">{editingBatch ? 'Edit Batch' : 'Add Batch'}</DialogTitle>
                 <DialogContent>
                     <form onSubmit={handleSubmit}>
@@ -261,6 +374,23 @@ const BatchesPage = () => {
                         </DialogActions>
                     </form>
                 </DialogContent>
+            </Dialog>
+
+            <Dialog open={confirmDeleteOpen} onClose={handleConfirmDeleteClose} aria-labelledby="alert-dialog-title">
+                <DialogTitle id="alert-dialog-title">{"Confirm Deletion"}</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body1">
+                        Are you sure you want to delete this batch?
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleConfirmDeleteClose} color="primary">
+                        Cancel
+                    </Button>
+                    <Button onClick={handleConfirmDelete} color="secondary" autoFocus>
+                        Delete
+                    </Button>
+                </DialogActions>
             </Dialog>
 
             <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>

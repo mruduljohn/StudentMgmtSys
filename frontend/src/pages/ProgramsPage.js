@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Container, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid2 as Grid, CircularProgress, Snackbar, Alert } from '@mui/material';
+import { Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Container, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid2 as Grid, CircularProgress, Snackbar, Alert, Select, MenuItem, TableSortLabel, TablePagination } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { getActivePrograms, createProgram, updateProgram, deleteProgram } from '../services/api';
-import { AuthContext } from '../utils/AuthContext';
+import { getActivePrograms, createProgram, updateProgram, deleteProgram, getConfigurableOptions } from '../services/api';
+import { AuthContext, useAuth } from '../utils/AuthContext';
 
 const ProgramsPage = () => {
     const [programs, setPrograms] = useState([]);
@@ -15,14 +15,24 @@ const ProgramsPage = () => {
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+    const [batches, setBatches] = useState([]); // Define setBatches
+    const [hostels, setHostels] = useState([]); // Define setHostels
+    const [classTeachers, setClassTeachers] = useState([]); // Define setClassTeachers
+    const [order, setOrder] = useState('asc');
+    const [orderBy, setOrderBy] = useState('program_name');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(100);
+    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+    const [deleteProgramId, setDeleteProgramId] = useState(null);
     const navigate = useNavigate();
-    const { authState } = React.useContext(AuthContext);
+    const { authState } = useAuth();
 
     useEffect(() => {
         if (!authState.isAuthenticated) {
             navigate('/login');
         } else {
             fetchPrograms();
+            fetchConfigurableOptions();
         }
     }, [authState.isAuthenticated, navigate]);
 
@@ -33,6 +43,27 @@ const ProgramsPage = () => {
         } catch (error) {
             console.error('Failed to fetch programs:', error);
             setSnackbarMessage('Failed to fetch programs');
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
+        }
+    };
+
+    const fetchConfigurableOptions = async () => {
+        try {
+            const batchResponse = await getConfigurableOptions('BATCH');
+            setBatches(batchResponse.data);
+
+            const hostelResponse = await getConfigurableOptions('HOSTEL');
+            setHostels(hostelResponse.data);
+
+            const programResponse = await getConfigurableOptions('PROGRAM');
+            setPrograms(programResponse.data);
+
+            const classTeacherResponse = await getConfigurableOptions('CLASS_TEACHER');
+            setClassTeachers(classTeacherResponse.data);
+        } catch (error) {
+            console.error('Failed to fetch configurable options:', error);
+            setSnackbarMessage('Failed to fetch configurable options');
             setSnackbarSeverity('error');
             setSnackbarOpen(true);
         }
@@ -92,6 +123,64 @@ const ProgramsPage = () => {
         }
     };
 
+    const handleRequestSort = (property) => {
+        const isAsc = orderBy === property && order === 'asc';
+        setOrder(isAsc ? 'desc' : 'asc');
+        setOrderBy(property);
+    };
+
+    const stableSort = (array, comparator) => {
+        const stabilizedThis = array.map((el, index) => [el, index]);
+        stabilizedThis.sort((a, b) => {
+            const order = comparator(a[0], b[0]);
+            if (order !== 0) return order;
+            return a[1] - b[1];
+        });
+        return stabilizedThis.map((el) => el[0]);
+    };
+
+    const descendingComparator = (a, b, orderBy) => {
+        if (b[orderBy] < a[orderBy]) {
+            return -1;
+        }
+        if (b[orderBy] > a[orderBy]) {
+            return 1;
+        }
+        return 0;
+    };
+
+    const getComparator = (order, orderBy) => {
+        return order === 'desc'
+            ? (a, b) => descendingComparator(a, b, orderBy)
+            : (a, b) => -descendingComparator(a, b, orderBy);
+    };
+
+    const handlePageChange = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleRowsPerPageChange = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
+    const handleConfirmDeleteOpen = (id) => {
+        setDeleteProgramId(id);
+        setConfirmDeleteOpen(true);
+    };
+
+    const handleConfirmDeleteClose = () => {
+        setDeleteProgramId(null);
+        setConfirmDeleteOpen(false);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (deleteProgramId) {
+            await handleDelete(deleteProgramId);
+        }
+        handleConfirmDeleteClose();
+    };
+
     const handleSnackbarClose = (event, reason) => {
         if (reason === 'clickaway') {
             return;
@@ -112,31 +201,48 @@ const ProgramsPage = () => {
                 <Table>
                     <TableHead>
                         <TableRow>
-                            <TableCell>ID</TableCell>
-                            <TableCell>Program Name</TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'program_name'}
+                                    direction={orderBy === 'program_name' ? order : 'asc'}
+                                    onClick={() => handleRequestSort('program_name')}
+                                >
+                                    Program Name
+                                </TableSortLabel>
+                            </TableCell>
                             <TableCell>Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {programs.map((program) => (
-                            <TableRow key={program.id}>
-                                <TableCell>{program.id}</TableCell>
-                                <TableCell>{program.value}</TableCell>
-                                <TableCell>
-                                    <Button variant="outlined" color="primary" onClick={() => handleOpen(program)}>
-                                        Edit
-                                    </Button>
-                                    <Button variant="outlined" color="secondary" onClick={() => handleDelete(program.id)}>
-                                        Delete
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                        {stableSort(programs, getComparator(order, orderBy))
+                            .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                            .map((program) => (
+                                <TableRow key={program.id}>
+                                    <TableCell>{program.value}</TableCell>
+                                    <TableCell>
+                                        <Button variant="outlined" color="primary" onClick={() => handleOpen(program)}>
+                                            Edit
+                                        </Button>
+                                        <Button variant="outlined" color="secondary" onClick={() => handleConfirmDeleteOpen(program.id)}>
+                                            Delete
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
                     </TableBody>
                 </Table>
             </TableContainer>
+            <TablePagination
+                rowsPerPageOptions={[100]}
+                component="div"
+                count={programs.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handlePageChange}
+                onRowsPerPageChange={handleRowsPerPageChange}
+            />
 
-            <Dialog open={open} onClose={handleClose} aria-labelledby="form-dialog-title">
+            <Dialog open={open} onClose={handleClose} aria-labelledby="form-dialog-title" fullWidth maxWidth="md">
                 <DialogTitle id="form-dialog-title">{editingProgram ? 'Edit Program' : 'Add Program'}</DialogTitle>
                 <DialogContent>
                     <form onSubmit={handleSubmit}>
@@ -163,6 +269,23 @@ const ProgramsPage = () => {
                         </DialogActions>
                     </form>
                 </DialogContent>
+            </Dialog>
+
+            <Dialog open={confirmDeleteOpen} onClose={handleConfirmDeleteClose} aria-labelledby="alert-dialog-title">
+                <DialogTitle id="alert-dialog-title">{"Confirm Deletion"}</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body1">
+                        Are you sure you want to delete this program?
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleConfirmDeleteClose} color="primary">
+                        Cancel
+                    </Button>
+                    <Button onClick={handleConfirmDelete} color="secondary" autoFocus>
+                        Delete
+                    </Button>
+                </DialogActions>
             </Dialog>
 
             <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>

@@ -1,5 +1,5 @@
-import React, { createContext, useState, useEffect } from 'react';
-import { login, setAuthToken } from '../services/api';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { login } from '../services/api';
 
 export const AuthContext = createContext();
 
@@ -11,40 +11,25 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const token = localStorage.getItem('token');
-        const userString = localStorage.getItem('user');
-        if (token && userString) {
-            try {
-                const user = JSON.parse(userString);
-                setAuthToken(token);
-                setAuthState({ isAuthenticated: true, user });
-            } catch (error) {
-                console.error('Error parsing user data from localStorage:', error);
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                setAuthToken(null);
-                setAuthState({ isAuthenticated: false, user: null });
-            }
+        if (token) {
+            setAuthState({ isAuthenticated: true, user: JSON.parse(localStorage.getItem('user')) });
         }
     }, []);
 
     const loginHandler = async (userData) => {
         try {
-            console.log('Logging in with data:', userData); // Debug log
             const response = await login(userData);
-            const { token, user } = response.data;
-            localStorage.setItem('token', token);
-            localStorage.setItem('user', JSON.stringify(user));
-            setAuthToken(token);
-            setAuthState({ isAuthenticated: true, user });
+            localStorage.setItem('token', response.data.token);
+            localStorage.setItem('user', JSON.stringify(response.data.user));
+            setAuthState({ isAuthenticated: true, user: response.data.user });
         } catch (error) {
-            console.error('Login failed:', error.response ? error.response.data : error.message);
+            console.error('Login failed:', error);
         }
     };
 
     const logoutHandler = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        setAuthToken(null);
         setAuthState({ isAuthenticated: false, user: null });
     };
 
@@ -54,3 +39,5 @@ export const AuthProvider = ({ children }) => {
         </AuthContext.Provider>
     );
 };
+
+export const useAuth = () => useContext(AuthContext);
