@@ -13,4 +13,11 @@ const getUserByUsername = async (username) => {
     return pool.query('SELECT * FROM users WHERE username = $1', [username]);
 };
 
-module.exports = { createUser, getUserByUsername };
+const updateUserLastLogin = async (userId) => {
+    return pool.query(
+        'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1',
+        [userId]
+    );
+};
+
+module.exports = { createUser, getUserByUsername, updateUserLastLogin };

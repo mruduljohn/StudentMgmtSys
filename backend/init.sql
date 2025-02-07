@@ -42,7 +42,7 @@ CREATE TABLE users (
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE,
-    role VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN', 'MENTOR')),
+    role VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN', 'USER')),
     status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')),
     last_login TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -70,10 +70,11 @@ CREATE TABLE students (
     student_id VARCHAR(20) UNIQUE NOT NULL,
     phone_number VARCHAR(20) CHECK (phone_number ~ '^[0-9+]+$'),
     gender VARCHAR(20) CHECK (gender IN ('MALE', 'FEMALE', 'DIFFERENT')),
-    batch_id UUID,
-    hostel_id UUID,
+    batch VARCHAR(50) NOT NULL,
+    class_teacher VARCHAR(100),
+    hostel VARCHAR(100),
     stream VARCHAR(20) CHECK (stream IN ('MEDICAL', 'ENGINEERING', 'FOUNDATION')),
-    program_id UUID,
+    program VARCHAR(50) NOT NULL,
     study_material TEXT,
     uniform TEXT,
     id_card TEXT,
@@ -98,53 +99,36 @@ CREATE TABLE students (
     modified_by UUID REFERENCES users(id)
 );
 
--- Batches table
-CREATE TABLE batches (
+-- Configurable options table for batch, teacher, hostel, and program
+CREATE TABLE configurable_options (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    batch_id VARCHAR(20) UNIQUE NOT NULL,
-    strength INT,
-    stream VARCHAR(20) CHECK (stream IN ('MEDICAL', 'ENGINEERING', 'FOUNDATION')),
-    program_id UUID,
-    class_teacher VARCHAR(100),
-    fee_due_count INT DEFAULT 0,
-    study_material_due INT DEFAULT 0,
-    id_card_due INT DEFAULT 0,
-    uniform_due INT DEFAULT 0,
-    tab_due INT DEFAULT 0,
+    category VARCHAR(50) NOT NULL,
+    value VARCHAR(100) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    academic_year VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     modified_at TIMESTAMP,
     created_by UUID REFERENCES users(id),
-    modified_by UUID REFERENCES users(id)
+    modified_by UUID REFERENCES users(id),
+    UNIQUE (category, value, academic_year)
 );
 
--- Hostels table
-CREATE TABLE hostels (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    hostel_name VARCHAR(100) UNIQUE NOT NULL,
-    capacity INT,
-    filled_count INT DEFAULT 0,
-    vacancy INT GENERATED ALWAYS AS (capacity - filled_count) STORED,
-    gender_type VARCHAR(20) CHECK (gender_type IN ('BOYS', 'GIRLS')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    modified_at TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    modified_by UUID REFERENCES users(id)
-);
+-- Create indexes
+CREATE INDEX idx_students_student_id ON students(student_id);
+CREATE INDEX idx_students_batch ON students(batch);
+CREATE INDEX idx_students_hostel ON students(hostel);
+CREATE INDEX idx_students_stream ON students(stream);
+CREATE INDEX idx_students_program ON students(program);
+CREATE INDEX idx_configurable_options_category ON configurable_options(category, academic_year);
 
--- Programs table
-CREATE TABLE programs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    program_name VARCHAR(100) UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    modified_at TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    modified_by UUID REFERENCES users(id)
-);
+-- Add audit triggers
+CREATE TRIGGER students_audit
+AFTER INSERT OR UPDATE OR DELETE ON students
+FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
 
--- Foreign key constraints
-ALTER TABLE students ADD CONSTRAINT fk_batch FOREIGN KEY (batch_id) REFERENCES batches(id);
-ALTER TABLE students ADD CONSTRAINT fk_hostel FOREIGN KEY (hostel_id) REFERENCES hostels(id);
-ALTER TABLE students ADD CONSTRAINT fk_program FOREIGN KEY (program_id) REFERENCES programs(id);
+CREATE TRIGGER users_audit
+AFTER INSERT OR UPDATE OR DELETE ON users
+FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
 
 -- Insert initial dynamic headers
 INSERT INTO dynamic_headers (field_name, display_name) VALUES
@@ -161,27 +145,23 @@ INSERT INTO dynamic_headers (field_name, display_name) VALUES
 -- Create views for statistics
 CREATE OR REPLACE VIEW batch_statistics AS
 SELECT 
-    b.batch_id,
-    b.strength,
-    b.stream,
-    p.program_name,
-    b.class_teacher,
-    b.fee_due_count,
-    b.study_material_due,
-    b.id_card_due,
-    b.uniform_due,
-    b.tab_due
-FROM batches b
-LEFT JOIN programs p ON b.program_id = p.id;
+    batch,
+    COUNT(*) AS total_students,
+    COUNT(CASE WHEN fee_due > 0 THEN 1 END) AS fee_due_count,
+    COUNT(CASE WHEN study_material IS NOT NULL THEN 1 END) AS study_material_count,
+    COUNT(CASE WHEN uniform IS NOT NULL THEN 1 END) AS uniform_count,
+    COUNT(CASE WHEN id_card IS NOT NULL THEN 1 END) AS id_card_count,
+    COUNT(CASE WHEN tab IS NOT NULL THEN 1 END) AS tab_count
+FROM students
+GROUP BY batch;
 
 CREATE OR REPLACE VIEW hostel_statistics AS
 SELECT 
-    h.hostel_name,
-    h.capacity,
-    h.filled_count,
-    h.vacancy,
-    h.gender_type
-FROM hostels h;
+    hostel,
+    COUNT(*) AS current_occupancy
+FROM students
+WHERE hostel IS NOT NULL
+GROUP BY hostel;
 
 -- Function to validate student data
 CREATE OR REPLACE FUNCTION validate_student_data()
@@ -225,67 +205,125 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Populate initial class teachers, hostels, and programs
-INSERT INTO programs (program_name)
+-- Populate initial class teachers
+INSERT INTO configurable_options 
+    (category, value, academic_year)
 VALUES
-('PROGRAM1'),
-('PROGRAM2'),
-('PROGRAM3'),
-('PROGRAM4'),
-('PROGRAM5'),
-('PROGRAM6'),
-('PROGRAM7'),
-('PROGRAM8'),
-('PROGRAM9'),
-('PROGRAM10');
+    ('CLASS_TEACHER', 'TEACHER1', get_current_academic_year()),
+    ('CLASS_TEACHER', 'TEACHER2', get_current_academic_year()),
+    ('CLASS_TEACHER', 'TEACHER3', get_current_academic_year()),
+    ('CLASS_TEACHER', 'TEACHER4', get_current_academic_year()),
+    ('CLASS_TEACHER', 'TEACHER5', get_current_academic_year()),
+    ('CLASS_TEACHER', 'TEACHER6', get_current_academic_year()),
+    ('CLASS_TEACHER', 'TEACHER7', get_current_academic_year()),
+    ('CLASS_TEACHER', 'TEACHER8', get_current_academic_year()),
+    ('CLASS_TEACHER', 'TEACHER9', get_current_academic_year()),
+    ('CLASS_TEACHER', 'TEACHER10', get_current_academic_year());
 
-INSERT INTO hostels (hostel_name, capacity, gender_type)
+-- Populate initial hostels
+INSERT INTO configurable_options 
+    (category, value, academic_year)
 VALUES
-('HOSTEL1', 100, 'BOYS'),
-('HOSTEL2', 100, 'GIRLS'),
-('HOSTEL3', 100, 'BOYS'),
-('HOSTEL4', 100, 'GIRLS'),
-('HOSTEL5', 100, 'BOYS'),
-('HOSTEL6', 100, 'GIRLS'),
-('HOSTEL7', 100, 'BOYS'),
-('HOSTEL8', 100, 'GIRLS'),
-('HOSTEL9', 100, 'BOYS'),
-('HOSTEL10', 100, 'GIRLS');
+    ('HOSTEL', 'HOSTEL1', get_current_academic_year()),
+    ('HOSTEL', 'HOSTEL2', get_current_academic_year()),
+    ('HOSTEL', 'HOSTEL3', get_current_academic_year()),
+    ('HOSTEL', 'HOSTEL4', get_current_academic_year()),
+    ('HOSTEL', 'HOSTEL5', get_current_academic_year()),
+    ('HOSTEL', 'HOSTEL6', get_current_academic_year()),
+    ('HOSTEL', 'HOSTEL7', get_current_academic_year()),
+    ('HOSTEL', 'HOSTEL8', get_current_academic_year()),
+    ('HOSTEL', 'HOSTEL9', get_current_academic_year()),
+    ('HOSTEL', 'HOSTEL10', get_current_academic_year());
 
-INSERT INTO batches (batch_id, strength, stream, program_id, class_teacher)
-SELECT
-    'BATCH01',
-    50,
-    'MEDICAL',
-    p.id,
-    'TEACHER1'
-FROM programs p
-WHERE p.program_name = 'PROGRAM1';
+-- Populate initial programs
+INSERT INTO configurable_options 
+    (category, value, academic_year)
+VALUES
+    ('PROGRAM', 'PROGRAM1', get_current_academic_year()),
+    ('PROGRAM', 'PROGRAM2', get_current_academic_year()),
+    ('PROGRAM', 'PROGRAM3', get_current_academic_year()),
+    ('PROGRAM', 'PROGRAM4', get_current_academic_year()),
+    ('PROGRAM', 'PROGRAM5', get_current_academic_year()),
+    ('PROGRAM', 'PROGRAM6', get_current_academic_year()),
+    ('PROGRAM', 'PROGRAM7', get_current_academic_year()),
+    ('PROGRAM', 'PROGRAM8', get_current_academic_year()),
+    ('PROGRAM', 'PROGRAM9', get_current_academic_year()),
+    ('PROGRAM', 'PROGRAM10', get_current_academic_year());
 
-INSERT INTO batches (batch_id, strength, stream, program_id, class_teacher)
-SELECT
-    'BATCH02',
-    50,
-    'ENGINEERING',
-    p.id,
-    'TEACHER2'
-FROM programs p
-WHERE p.program_name = 'PROGRAM2';
+-- Create helper functions for managing configurable options
+-- Function to add new configurable option
+CREATE OR REPLACE FUNCTION add_configurable_option(
+    p_category VARCHAR,
+    p_value VARCHAR,
+    p_academic_year VARCHAR DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE
+    v_academic_year VARCHAR;
+    v_new_id UUID;
+BEGIN
+    IF p_academic_year IS NULL THEN
+        v_academic_year := get_current_academic_year();
+    ELSE
+        v_academic_year := p_academic_year;
+    END IF;
+    INSERT INTO configurable_options (category, value, academic_year)
+    VALUES (p_category, p_value, v_academic_year)
+    RETURNING id INTO v_new_id;
+    RETURN v_new_id;
+END;
+$$ LANGUAGE plpgsql;
 
--- Add audit triggers
-CREATE TRIGGER students_audit
-AFTER INSERT OR UPDATE OR DELETE ON students
-FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+-- Function to deactivate configurable option
+CREATE OR REPLACE FUNCTION deactivate_configurable_option(
+    p_category VARCHAR,
+    p_value VARCHAR,
+    p_academic_year VARCHAR DEFAULT NULL
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_academic_year VARCHAR;
+BEGIN
+    IF p_academic_year IS NULL THEN
+        v_academic_year := get_current_academic_year();
+    ELSE
+        v_academic_year := p_academic_year;
+    END IF;
+    UPDATE configurable_options
+    SET is_active = false,
+        modified_at = CURRENT_TIMESTAMP
+    WHERE category = p_category
+    AND value = p_value
+    AND academic_year = v_academic_year;
+    RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql;
 
-CREATE TRIGGER users_audit
-AFTER INSERT OR UPDATE OR DELETE ON users
-FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+-- Create views for easy access to active options
+CREATE OR REPLACE VIEW active_teachers AS
+SELECT value as teacher_name, created_at, modified_at
+FROM configurable_options
+WHERE category = 'CLASS_TEACHER'
+AND is_active = true
+AND academic_year = get_current_academic_year()
+ORDER BY value;
 
--- Create indexes
-CREATE INDEX idx_students_student_id ON students(student_id);
-CREATE INDEX idx_students_batch_id ON students(batch_id);
-CREATE INDEX idx_students_hostel_id ON students(hostel_id);
-CREATE INDEX idx_students_program_id ON students(program_id);
-CREATE INDEX idx_batches_batch_id ON batches(batch_id);
-CREATE INDEX idx_hostels_hostel_name ON hostels(hostel_name);
-CREATE INDEX idx_programs_program_name ON programs(program_name);
+CREATE OR REPLACE VIEW active_hostels AS
+SELECT value as hostel_name, created_at, modified_at
+FROM configurable_options
+WHERE category = 'HOSTEL'
+AND is_active = true
+AND academic_year = get_current_academic_year()
+ORDER BY value;
+
+CREATE OR REPLACE VIEW active_programs AS
+SELECT value as program_name, created_at, modified_at
+FROM configurable_options
+WHERE category = 'PROGRAM'
+AND is_active = true
+AND academic_year = get_current_academic_year()
+ORDER BY value;
+
+-- Example usage of helper functions:
+-- SELECT add_configurable_option('CLASS_TEACHER', 'TEACHER11');
+-- SELECT deactivate_configurable_option('CLASS_TEACHER', 'TEACHER1');
