@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Container, Dialog, DialogTitle, DialogContent,TablePagination, DialogActions, TextField, Grid2 as Grid, CircularProgress, Snackbar, Alert, Select, MenuItem, TableSortLabel } from '@mui/material';
+import { Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Container, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid2 as Grid, CircularProgress, Snackbar, Alert, Select, MenuItem, TableSortLabel, TablePagination } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { getStudents, createStudent, updateStudent, deleteStudent, uploadExcel, downloadExcel, getConfigurableOptions } from '../services/api';
+import { getStudents, getConfigurableOptions, updateStudent,createStudent,deleteStudent } from '../services/api';
 import { useAuth } from '../utils/AuthContext';
 
-
-const StudentsPage = () => {
+const AdminDashboard = () => {
     const [students, setStudents] = useState([]);
     const [open, setOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
@@ -52,6 +51,8 @@ const StudentsPage = () => {
     const [rowsPerPage, setRowsPerPage] = useState(100);
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
     const [deleteStudentId, setDeleteStudentId] = useState(null);
+    const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+    const [updateStudentId, setUpdateStudentId] = useState(null);
     const navigate = useNavigate();
     const { authState } = useAuth();
 
@@ -181,63 +182,6 @@ const StudentsPage = () => {
         }
     };
 
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const formData = new FormData();
-            formData.append('file', file);
-            handleUploadExcel(formData);
-        }
-    };
-
-    const handleUploadExcel = async (formData) => {
-        try {
-            setLoading(true);
-            await uploadExcel(formData);
-            fetchStudents();
-            setSnackbarMessage('Students imported successfully');
-            setSnackbarSeverity('success');
-            setSnackbarOpen(true);
-        } catch (error) {
-            console.error('Failed to upload Excel file:', error);
-            setSnackbarMessage('Failed to upload Excel file');
-            setSnackbarSeverity('error');
-            setSnackbarOpen(true);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleDownloadExcel = async () => {
-        try {
-            setLoading(true);
-            const response = await downloadExcel();
-            const url = window.URL.createObjectURL(new Blob([response]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'students.xlsx');
-            document.body.appendChild(link);
-            link.click();
-            setSnackbarMessage('Students exported successfully');
-            setSnackbarSeverity('success');
-            setSnackbarOpen(true);
-        } catch (error) {
-            console.error('Failed to download Excel file:', error);
-            setSnackbarMessage('Failed to download Excel file');
-            setSnackbarSeverity('error');
-            setSnackbarOpen(true);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSnackbarClose = (event, reason) => {
-        if (reason === 'clickaway') {
-            return;
-        }
-        setSnackbarOpen(false);
-    };
-
     const handleRequestSort = (property) => {
         const isAsc = orderBy === property && order === 'asc';
         setOrder(isAsc ? 'desc' : 'asc');
@@ -296,29 +240,50 @@ const StudentsPage = () => {
         handleConfirmDeleteClose();
     };
 
+    const handleConfirmUpdateOpen = (id) => {
+        setUpdateStudentId(id);
+        setConfirmUpdateOpen(true);
+    };
+
+    const handleConfirmUpdateClose = () => {
+        setUpdateStudentId(null);
+        setConfirmUpdateOpen(false);
+    };
+
+    const handleConfirmUpdate = async () => {
+        if (updateStudentId) {
+            await updateStudent(updateStudentId, formData);
+        }
+        handleConfirmUpdateClose();
+    };
+
+    const handleSnackbarClose = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbarOpen(false);
+    };
+
     return (
         <Container>
             <Typography variant="h4" gutterBottom>
-                Students
+                Admin Dashboard
             </Typography>
             <Button variant="contained" color="primary" onClick={() => handleOpen(null)} style={{ marginBottom: '20px' }}>
                 Add Student
             </Button>
-            <Button variant="contained" color="success" onClick={handleDownloadExcel} style={{ marginBottom: '20px', marginLeft: '10px' }}>
-                Download Excel
+            <Button variant="contained" color="success" onClick={() => navigate('/batches')} style={{ marginBottom: '20px', marginLeft: '10px' }}>
+                Manage Batches
             </Button>
-            <input
-                accept=".xlsx"
-                style={{ display: 'none' }}
-                id="contained-button-file"
-                type="file"
-                onChange={handleFileChange}
-            />
-            <label htmlFor="contained-button-file">
-                <Button variant="contained" color="info" component="span" style={{ marginBottom: '20px', marginLeft: '10px' }}>
-                    Upload Excel
-                </Button>
-            </label>
+            <Button variant="contained" color="info" onClick={() => navigate('/hostels')} style={{ marginBottom: '20px', marginLeft: '10px' }}>
+                Manage Hostels
+            </Button>
+            <Button variant="contained" color="warning" onClick={() => navigate('/programs')} style={{ marginBottom: '20px', marginLeft: '10px' }}>
+                Manage Programs
+            </Button>
+            <Button variant="contained" color="error" onClick={() => navigate('/teachers')} style={{ marginBottom: '20px', marginLeft: '10px' }}>
+                Manage Teachers
+            </Button>
             {loading && <CircularProgress style={{ marginLeft: '10px' }} />}
             <TableContainer component={Paper}>
                 <Table>
@@ -861,4 +826,4 @@ const StudentsPage = () => {
     );
 };
 
-export default StudentsPage;
+export default AdminDashboard;

@@ -70,7 +70,7 @@ const updateExistingStudent = async (req, res) => {
     try {
         const studentData = req.body;
         studentData.modified_by = req.user.id;
-        const student = await updateStudent(req.params.id, studentData, req); // Pass req object
+        const student = await updateStudent(req.params.id, studentData, req);
         if (student.rows.length === 0) {
             return res.status(404).json({ message: 'Student not found' });
         }

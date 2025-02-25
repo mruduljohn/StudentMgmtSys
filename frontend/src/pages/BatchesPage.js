@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Container, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid2 as Grid, CircularProgress, Snackbar, Alert, Select, MenuItem, TableSortLabel, TablePagination } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { getActiveBatches, createBatch, updateBatch, deleteBatch, getConfigurableOptions } from '../services/api';
-import { AuthContext } from '../utils/AuthContext';
+import { useAuth } from '../utils/AuthContext';
 
 const BatchesPage = () => {
     const [batches, setBatches] = useState([]);
@@ -28,7 +28,7 @@ const BatchesPage = () => {
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
     const [deleteBatchId, setDeleteBatchId] = useState(null);
     const navigate = useNavigate();
-    const { authState } = React.useContext(AuthContext);
+    const { authState } = useAuth();
 
     useEffect(() => {
         if (!authState.isAuthenticated) {

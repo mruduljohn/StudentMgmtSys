@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { login } from '../services/api';
+import { setAuthToken } from '../services/api';
 
-export const AuthContext = createContext();
+const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     const [authState, setAuthState] = useState({
@@ -12,6 +13,7 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const token = localStorage.getItem('token');
         if (token) {
+            setAuthToken(token); // Set token in api.js
             setAuthState({ isAuthenticated: true, user: JSON.parse(localStorage.getItem('user')) });
         }
     }, []);
@@ -19,6 +21,7 @@ export const AuthProvider = ({ children }) => {
     const loginHandler = async (userData) => {
         try {
             const response = await login(userData);
+            setAuthToken(response.data.token); // Set token in api.js
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('user', JSON.stringify(response.data.user));
             setAuthState({ isAuthenticated: true, user: response.data.user });
@@ -28,6 +31,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logoutHandler = () => {
+        setAuthToken(null); // Clear token in api.js
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setAuthState({ isAuthenticated: false, user: null });

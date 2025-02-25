@@ -60,3 +60,11 @@ export const getAuditLogs = () => apiClient.get('/audit-logs');
 // Excel Routes
 export const uploadExcel = (formData) => apiClient.post('/upload-excel', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const downloadExcel = () => apiClient.get('/download-excel', { responseType: 'blob' });
+
+// Initialize token from localStorage on load
+const token = localStorage.getItem('token');
+if (token) {
+    setAuthToken(token);
+}
+
+export default apiClient;

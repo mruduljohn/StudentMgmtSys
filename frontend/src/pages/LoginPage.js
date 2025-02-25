@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
-import { Typography, TextField, Button, Paper, Grid2 as Grid, Container } from '@mui/material';
+import { Typography, TextField, Button, Container, Snackbar, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../utils/AuthContext';
+import { login } from '../services/api';
+import { setAuthToken } from '../services/api';
+import { useAuth } from '../utils/AuthContext';
 
 const LoginPage = () => {
-    const [formData, setFormData] = useState({ username: '', password: '' });
+    const [formData, setFormData] = useState({
+        username: '',
+        password: '',
+    });
+    const [loading, setLoading] = useState(false);
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [snackbarMessage, setSnackbarMessage] = useState('');
+    const [snackbarSeverity, setSnackbarSeverity] = useState('success');
     const navigate = useNavigate();
-    const { loginHandler } = React.useContext(AuthContext);
+    const { loginHandler } = useAuth();
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -14,54 +23,70 @@ const LoginPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Form Data:', formData); // Debug log
+        setLoading(true);
         try {
-            await loginHandler(formData);
-            navigate('/students');
+            const response = await login(formData);
+            setAuthToken(response.data.token); // Set token in api.js
+            localStorage.setItem('token', response.data.token);
+            localStorage.setItem('user', JSON.stringify(response.data.user));
+            loginHandler(response.data.user); // Update AuthContext
+            navigate('/');
+            setSnackbarMessage('Logged in successfully');
+            setSnackbarSeverity('success');
+            setSnackbarOpen(true);
         } catch (error) {
             console.error('Login failed:', error);
+            setSnackbarMessage('Login failed');
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
+        } finally {
+            setLoading(false);
         }
     };
 
+    const handleSnackbarClose = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbarOpen(false);
+    };
+
     return (
-        <Container component="main" maxWidth="xs">
-            <Paper elevation={3} style={{ padding: '20px', marginTop: '50px' }}>
-                <Typography variant="h5" gutterBottom align="center">
-                    Login
-                </Typography>
-                <form onSubmit={handleSubmit}>
-                    <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                            <TextField
-                                variant="outlined"
-                                required
-                                fullWidth
-                                label="Username"
-                                name="username"
-                                value={formData.username}
-                                onChange={handleChange}
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <TextField
-                                variant="outlined"
-                                required
-                                fullWidth
-                                label="Password"
-                                name="password"
-                                type="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <Button type="submit" fullWidth variant="contained" color="primary">
-                                Login
-                            </Button>
-                        </Grid>
-                    </Grid>
-                </form>
-            </Paper>
+        <Container>
+            <Typography variant="h4" gutterBottom>
+                Login
+            </Typography>
+            <form onSubmit={handleSubmit}>
+                <TextField
+                    variant="outlined"
+                    margin="normal"
+                    required
+                    fullWidth
+                    label="Username"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleChange}
+                />
+                <TextField
+                    variant="outlined"
+                    margin="normal"
+                    required
+                    fullWidth
+                    label="Password"
+                    name="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                />
+                <Button type="submit" variant="contained" color="primary" disabled={loading}>
+                    {loading ? 'Logging in...' : 'Login'}
+                </Button>
+            </form>
+            <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
+                <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+                    {snackbarMessage}
+                </Alert>
+            </Snackbar>
         </Container>
     );
 };
