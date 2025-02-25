@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Container, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid2 as Grid, CircularProgress, Snackbar, Alert, TableSortLabel, TablePagination } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { getStudents, updateStudent, getConfigurableOptions,setBatches,setClassTeachers,setPrograms,setHostels } from '../services/api';
+import { getStudents, updateStudent, getConfigurableOptions} from '../services/api';
 import { useAuth } from '../utils/AuthContext';
 
 const TeacherDashboard = () => {
     const [students, setStudents] = useState([]);
     const [open, setOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
+    const [batches, setBatches] = useState([]);
+    const [classTeachers, setClassTeachers] = useState([]);
+    const [programs, setPrograms] = useState([]);    
+    const [hostels, setHostels] = useState([]);
+            
     const [formData, setFormData] = useState({
         remarks: '',
         remarks1: '',

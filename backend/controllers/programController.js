@@ -1,10 +1,10 @@
 const { getActivePrograms, getProgramById, createProgram, updateProgram, deleteProgram } = require('../models/program');
 const jwt = require('jsonwebtoken');
+const pool = require('../models/db');
 
 const verifyToken = (req, res, next) => {
     const token = req.header('Authorization')?.split(' ')[1];
     if (!token) return res.status(403).json({ message: 'Access Denied' });
-
     try {
         const verified = jwt.verify(token, process.env.SECRET_KEY);
         req.user = verified;
@@ -84,4 +84,12 @@ const deleteExistingProgram = async (req, res) => {
     }
 };
 
-module.exports = { getAllPrograms, getSingleProgram, createNewProgram, updateExistingProgram, deleteExistingProgram, verifyToken, isAdmin };
+module.exports = {
+    getAllPrograms,
+    getSingleProgram,
+    createNewProgram,
+    updateExistingProgram,
+    deleteExistingProgram,
+    verifyToken,
+    isAdmin,
+};

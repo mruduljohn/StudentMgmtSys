@@ -53,6 +53,7 @@ export const deleteProgram = (id) => apiClient.delete(`/programs/${id}`);
 export const getConfigurableOptions = (category) => apiClient.get(`/configurable-options/${category}`);
 export const addConfigurableOption = (category, value, academicYear) => apiClient.post('/configurable-options', { category, value, academicYear });
 export const deactivateConfigurableOption = (id) => apiClient.delete(`/configurable-options/${id}`);
+export const updateConfigurableOption = (id, data) => apiClient.put(`/configurable-options/${id}`, data);
 
 // Audit Logs Routes
 export const getAuditLogs = () => apiClient.get('/audit-logs');

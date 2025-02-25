@@ -5,39 +5,35 @@ const getActiveHostels = async () => {
 };
 
 const getHostelById = async (id) => {
-    return pool.query('SELECT * FROM configurable_options WHERE id = $1', [id]);
+    return pool.query('SELECT * FROM configurable_options WHERE id = $1 AND is_active = true', [id]);
 };
 
 const createHostel = async (hostelData) => {
+    const academicYear = await pool.query('SELECT get_current_academic_year()').then(result => result.rows[0].get_current_academic_year);
     return pool.query(
         'INSERT INTO configurable_options (category, value, academic_year, created_by, modified_by) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [
-            'HOSTEL',
-            hostelData.hostel_name,
-            hostelData.academic_year,
-            hostelData.created_by,
-            hostelData.modified_by,
-        ]
+        ['HOSTEL', hostelData.hostel_name, academicYear, hostelData.created_by, hostelData.modified_by]
     );
 };
 
-const updateHostel = async (id, hostelData) => {
+const updateExistingHostel = async (id, hostelData) => {
     return pool.query(
-        'UPDATE configurable_options SET value = $1, academic_year = $2, modified_at = CURRENT_TIMESTAMP, modified_by = $3 WHERE id = $4 RETURNING *',
-        [
-            hostelData.hostel_name,
-            hostelData.academic_year,
-            hostelData.modified_by,
-            id,
-        ]
+        'UPDATE configurable_options SET value = $1, modified_at = CURRENT_TIMESTAMP, modified_by = $2 WHERE id = $3 RETURNING *',
+        [hostelData.hostel_name, hostelData.modified_by, id]
     );
 };
 
-const deleteHostel = async (id) => {
+const deleteExistingHostel = async (id) => {
     return pool.query(
         'UPDATE configurable_options SET is_active = false, modified_at = CURRENT_TIMESTAMP, modified_by = $1 WHERE id = $2',
-        [req.user.id, id]
+        [hostelData.modified_by, id]
     );
 };
 
-module.exports = { getActiveHostels, getHostelById, createHostel, updateHostel, deleteHostel };
+module.exports = {
+    getActiveHostels,
+    getHostelById,
+    createHostel,
+    updateExistingHostel,
+    deleteExistingHostel,
+};

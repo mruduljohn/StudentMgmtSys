@@ -46,12 +46,13 @@ router.delete('/programs/:id', programController.verifyToken, programController.
 router.get('/configurable-options/:category', configurableOptionsController.verifyToken, configurableOptionsController.isAdmin, configurableOptionsController.getConfigurableOptions);
 router.post('/configurable-options', configurableOptionsController.verifyToken, configurableOptionsController.isAdmin, configurableOptionsController.addConfigurableOption);
 router.delete('/configurable-options/:id', configurableOptionsController.verifyToken, configurableOptionsController.isAdmin, configurableOptionsController.deactivateConfigurableOption);
+router.put('/configurable-options/:id', configurableOptionsController.verifyToken, configurableOptionsController.isAdmin, configurableOptionsController.updateConfigurableOption);
 
 // Audit Logs Routes
 router.get('/audit-logs', auditLogsController.verifyToken, auditLogsController.isAdmin, auditLogsController.getAllAuditLogs);
 
 // Excel Routes
-router.post('/upload-excel', studentController.verifyToken, studentController.isAdmin, studentController.upload.single('file'), excelController.uploadExcel);
+router.post('/upload-excel', studentController.verifyToken, studentController.isAdmin, excelController.upload.single('file'), excelController.uploadExcel);
 router.get('/download-excel', studentController.verifyToken, studentController.isAdmin, excelController.downloadExcel);
 
 module.exports = router;

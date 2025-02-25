@@ -197,6 +197,7 @@ DECLARE
 BEGIN
     current_month := EXTRACT(MONTH FROM CURRENT_DATE);
     current_year := EXTRACT(YEAR FROM CURRENT_DATE);
+
     IF current_month >= 6 THEN
         RETURN current_year || '-' || (current_year + 1);
     ELSE
@@ -251,6 +252,7 @@ VALUES
     ('PROGRAM', 'PROGRAM10', get_current_academic_year());
 
 -- Create helper functions for managing configurable options
+
 -- Function to add new configurable option
 CREATE OR REPLACE FUNCTION add_configurable_option(
     p_category VARCHAR,
@@ -267,9 +269,11 @@ BEGIN
     ELSE
         v_academic_year := p_academic_year;
     END IF;
-    INSERT INTO configurable_options (category, value, academic_year)
-    VALUES (p_category, p_value, v_academic_year)
+
+    INSERT INTO configurable_options (category, value, academic_year, created_by, modified_by)
+    VALUES (p_category, p_value, v_academic_year, CURRENT_USER, CURRENT_USER)
     RETURNING id INTO v_new_id;
+
     RETURN v_new_id;
 END;
 $$ LANGUAGE plpgsql;
@@ -279,7 +283,7 @@ CREATE OR REPLACE FUNCTION deactivate_configurable_option(
     p_category VARCHAR,
     p_value VARCHAR,
     p_academic_year VARCHAR DEFAULT NULL
-)
+) 
 RETURNS BOOLEAN AS $$
 DECLARE
     v_academic_year VARCHAR;
@@ -289,12 +293,15 @@ BEGIN
     ELSE
         v_academic_year := p_academic_year;
     END IF;
+
     UPDATE configurable_options
     SET is_active = false,
-        modified_at = CURRENT_TIMESTAMP
+        modified_at = CURRENT_TIMESTAMP,
+        modified_by = CURRENT_USER
     WHERE category = p_category
     AND value = p_value
     AND academic_year = v_academic_year;
+
     RETURN FOUND;
 END;
 $$ LANGUAGE plpgsql;
@@ -323,7 +330,3 @@ WHERE category = 'PROGRAM'
 AND is_active = true
 AND academic_year = get_current_academic_year()
 ORDER BY value;
-
--- Example usage of helper functions:
--- SELECT add_configurable_option('CLASS_TEACHER', 'TEACHER11');
--- SELECT deactivate_configurable_option('CLASS_TEACHER', 'TEACHER1');

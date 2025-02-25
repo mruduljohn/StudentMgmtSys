@@ -1,4 +1,4 @@
-const pool = require('../models/db');
+const configurableOptionsModel = require('../models/configurableOptions');
 const jwt = require('jsonwebtoken');
 
 const verifyToken = (req, res, next) => {
@@ -22,7 +22,7 @@ const isAdmin = (req, res, next) => {
 const getConfigurableOptions = async (req, res) => {
     try {
         const { category } = req.params;
-        const result = await pool.query('SELECT * FROM configurable_options WHERE category = $1 AND is_active = true', [category]);
+        const result = await configurableOptionsModel.getConfigurableOptions(category);
         res.json(result.rows);
     } catch (error) {
         console.error('Error fetching configurable options:', error);
@@ -33,11 +33,7 @@ const getConfigurableOptions = async (req, res) => {
 const addConfigurableOption = async (req, res) => {
     try {
         const { category, value, academicYear } = req.body;
-        const academicYearToUse = academicYear || await pool.query('SELECT get_current_academic_year()').then(result => result.rows[0].get_current_academic_year);
-        const result = await pool.query(
-            'INSERT INTO configurable_options (category, value, academic_year, created_by, modified_by) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [category, value, academicYearToUse, req.user.id, req.user.id]
-        );
+        const result = await configurableOptionsModel.addConfigurableOption(category, value, academicYear, req.user.id);
         res.status(201).json(result.rows[0]);
     } catch (error) {
         console.error('Error adding configurable option:', error);
@@ -48,10 +44,7 @@ const addConfigurableOption = async (req, res) => {
 const deactivateConfigurableOption = async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query(
-            'UPDATE configurable_options SET is_active = false, modified_at = CURRENT_TIMESTAMP, modified_by = $1 WHERE id = $2 RETURNING *',
-            [req.user.id, id]
-        );
+        const result = await configurableOptionsModel.deactivateConfigurableOption(id, req.user.id);
         if (result.rowCount === 0) {
             return res.status(404).json({ message: 'Configurable option not found' });
         }
@@ -62,10 +55,26 @@ const deactivateConfigurableOption = async (req, res) => {
     }
 };
 
+const updateConfigurableOption = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { value, academicYear } = req.body;
+        const result = await configurableOptionsModel.updateConfigurableOption(id, value, academicYear, req.user.id);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: 'Configurable option not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error updating configurable option:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getConfigurableOptions,
     addConfigurableOption,
     deactivateConfigurableOption,
+    updateConfigurableOption,
     verifyToken,
     isAdmin,
 };

@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Container, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid2 as Grid, CircularProgress, Snackbar, Alert, Select, MenuItem, TableSortLabel, TablePagination } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { getConfigurableOptions, addConfigurableOption, deactivateConfigurableOption } from '../services/api';
+import { getConfigurableOptions, addConfigurableOption, deactivateConfigurableOption, updateConfigurableOption } from '../services/api';
 import { useAuth } from '../utils/AuthContext';
-
-const pool = require('../models/db');
-
 
 const TeachersPage = () => {
     const [teachers, setTeachers] = useState([]);
@@ -92,9 +89,9 @@ const TeachersPage = () => {
         e.preventDefault();
         try {
             if (editingTeacher) {
-                await updateTeacher(editingTeacher.id, formData);
+                await updateConfigurableOption(editingTeacher.id, formData);
             } else {
-                await addTeacher(formData);
+                await addConfigurableOption('CLASS_TEACHER', formData.teacher_name, formData.batch);
             }
             handleClose();
             fetchTeachers();
@@ -187,27 +184,6 @@ const TeachersPage = () => {
             return;
         }
         setSnackbarOpen(false);
-    };
-
-    const addTeacher = async (teacherData) => {
-        try {
-            await addConfigurableOption('CLASS_TEACHER', teacherData.teacher_name, teacherData.batch);
-        } catch (error) {
-            console.error('Failed to add teacher:', error);
-            throw error;
-        }
-    };
-
-    const updateTeacher = async (id, teacherData) => {
-        try {
-            await pool.query(
-                'UPDATE configurable_options SET value = $1, academic_year = $2, modified_at = CURRENT_TIMESTAMP, modified_by = $3 WHERE id = $4',
-                [teacherData.teacher_name, teacherData.batch, authState.user.id, id]
-            );
-        } catch (error) {
-            console.error('Failed to update teacher:', error);
-            throw error;
-        }
     };
 
     return (
