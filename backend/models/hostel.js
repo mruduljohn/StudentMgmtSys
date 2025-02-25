@@ -16,14 +16,14 @@ const createHostel = async (hostelData) => {
     );
 };
 
-const updateExistingHostel = async (id, hostelData) => {
+const updateHostel = async (id, hostelData) => {
     return pool.query(
         'UPDATE configurable_options SET value = $1, modified_at = CURRENT_TIMESTAMP, modified_by = $2 WHERE id = $3 RETURNING *',
         [hostelData.hostel_name, hostelData.modified_by, id]
     );
 };
 
-const deleteExistingHostel = async (id) => {
+const deleteHostel = async (id) => {
     return pool.query(
         'UPDATE configurable_options SET is_active = false, modified_at = CURRENT_TIMESTAMP, modified_by = $1 WHERE id = $2',
         [hostelData.modified_by, id]
@@ -34,6 +34,6 @@ module.exports = {
     getActiveHostels,
     getHostelById,
     createHostel,
-    updateExistingHostel,
-    deleteExistingHostel,
+    updateHostel,
+    deleteHostel,
 };

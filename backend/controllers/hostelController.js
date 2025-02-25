@@ -1,4 +1,4 @@
-const { getActiveHostels, getHostelById, createHostel, updateExistingHostel, deleteExistingHostel } = require('../models/hostel');
+const { getActiveHostels, getHostelById, createHostel, updateHostel, deleteHostel } = require('../models/hostel');
 const jwt = require('jsonwebtoken');
 
 const verifyToken = (req, res, next) => {
