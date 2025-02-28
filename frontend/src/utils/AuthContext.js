@@ -12,9 +12,10 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const token = localStorage.getItem('token');
-        if (token) {
+        const user = localStorage.getItem('user');
+        if (token && user) {
             setAuthToken(token); // Set token in api.js
-            setAuthState({ isAuthenticated: true, user: JSON.parse(localStorage.getItem('user')) });
+            setAuthState({ isAuthenticated: true, user: JSON.parse(user) });
         }
     }, []);
 
@@ -45,3 +46,5 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+
+export default AuthContext;

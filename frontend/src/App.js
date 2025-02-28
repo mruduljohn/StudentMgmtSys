@@ -40,13 +40,14 @@ const PrivateRoute = ({ children }) => {
 
 const Dashboard = () => {
     const { authState } = useAuth();
-    if (authState.user.role === 'ADMIN') {
-        return <AdminDashboard />;
-    } else if (authState.user.role === 'USER') {
-        return <TeacherDashboard />;
-    } else {
-        return <Navigate to="/login" />;
+    if (authState.isAuthenticated) {
+        if (authState.user.role === 'ADMIN') {
+            return <AdminDashboard />;
+        } else if (authState.user.role === 'USER') {
+            return <TeacherDashboard />;
+        }
     }
+    return <Navigate to="/login" />;
 };
 
 export default App;

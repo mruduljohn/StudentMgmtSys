@@ -20,6 +20,9 @@ const Navbar = () => {
                 </Typography>
                 {authState.isAuthenticated ? (
                     <>
+                        <Button color="inherit" onClick={() => navigate('/')}>
+                            Home
+                        </Button>
                         {authState.user.role === 'ADMIN' && (
                             <>
                                 <Button color="inherit" onClick={() => navigate('/students')}>

@@ -23,6 +23,7 @@ const LoginPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (loading) return; // Prevent multiple submissions
         setLoading(true);
         try {
             const response = await login(formData);
@@ -30,7 +31,7 @@ const LoginPage = () => {
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('user', JSON.stringify(response.data.user));
             loginHandler(response.data.user); // Update AuthContext
-            navigate('/');
+            navigate('/', { replace: true }); // Replace history entry to prevent going back to login
             setSnackbarMessage('Logged in successfully');
             setSnackbarSeverity('success');
             setSnackbarOpen(true);

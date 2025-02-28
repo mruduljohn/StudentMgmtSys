@@ -1,4 +1,4 @@
-const { getActiveBatches, getBatchById, createBatch, updateBatch, deleteBatch } = require('../models/batch');
+const { getBatches, getBatchById, createBatch, updateBatch, deleteBatch } = require('../models/batch');
 const jwt = require('jsonwebtoken');
 
 const verifyToken = (req, res, next) => {
@@ -21,7 +21,7 @@ const isAdmin = (req, res, next) => {
 
 const getAllBatches = async (req, res) => {
     try {
-        const batches = await getActiveBatches();
+        const batches = await getBatches();
         res.json(batches.rows);
     } catch (error) {
         console.error('Error fetching batches:', error);

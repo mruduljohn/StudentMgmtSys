@@ -29,21 +29,21 @@ export const updateStudent = (id, studentData) => apiClient.put(`/students/${id}
 export const deleteStudent = (id) => apiClient.delete(`/students/${id}`);
 
 // Batch Routes
-export const getActiveBatches = () => apiClient.get('/batches');
+export const getActiveBatches = () => apiClient.get('/configurable-options/BATCH');
 export const getBatchById = (id) => apiClient.get(`/batches/${id}`);
 export const createBatch = (batchData) => apiClient.post('/batches', batchData);
 export const updateBatch = (id, batchData) => apiClient.put(`/batches/${id}`, batchData);
 export const deleteBatch = (id) => apiClient.delete(`/batches/${id}`);
 
 // Hostel Routes
-export const getActiveHostels = () => apiClient.get('/hostels');
+export const getActiveHostels = () => apiClient.get('/configurable-options/HOSTEL');
 export const getHostelById = (id) => apiClient.get(`/hostels/${id}`);
 export const createHostel = (hostelData) => apiClient.post('/hostels', hostelData);
 export const updateHostel = (id, hostelData) => apiClient.put(`/hostels/${id}`, hostelData);
 export const deleteHostel = (id) => apiClient.delete(`/hostels/${id}`);
 
 // Program Routes
-export const getActivePrograms = () => apiClient.get('/programs');
+export const getActivePrograms = () => apiClient.get('/configurable-options/PROGRAM');
 export const getProgramById = (id) => apiClient.get(`/programs/${id}`);
 export const createProgram = (programData) => apiClient.post('/programs', programData);
 export const updateProgram = (id, programData) => apiClient.put(`/programs/${id}`, programData);

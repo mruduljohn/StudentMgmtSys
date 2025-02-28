@@ -14,7 +14,7 @@ const addConfigurableOption = async (category, value, academicYear, createdBy) =
 
 const deactivateConfigurableOption = async (id, modifiedBy) => {
     return pool.query(
-        'UPDATE configurable_options SET is_active = false, modified_at = CURRENT_TIMESTAMP, modified_by = $1 WHERE id = $2 RETURNING *',
+        'UPDATE configurable_options SET is_active = false, modified_at = CURRENT_TIMESTAMP, modified_by = $1 WHERE id = $2',
         [modifiedBy, id]
     );
 };
