@@ -1,94 +1,117 @@
-import { create } from 'zustand';
+import { makeAutoObservable } from 'mobx';
+import axios from 'axios';
 import { Student, BatchConfig, RemarksConfig, FlagsConfig } from '../types';
 
-interface StudentState {
-  students: Student[];
-  batchConfig: BatchConfig;
-  remarksConfig: RemarksConfig;
-  flagsConfig: FlagsConfig;
-  
-  // Student CRUD operations
-  addStudent: (student: Student) => void;
-  updateStudent: (studentId: string, updatedData: Partial<Student>) => void;
-  deleteStudent: (studentId: string) => void;
-  
-  // Bulk operations
-  importStudents: (students: Student[]) => void;
-  
-  // Configuration updates
-  updateBatchConfig: (config: Partial<BatchConfig>) => void;
-  updateRemarksConfig: (config: Partial<RemarksConfig>) => void;
-  updateFlagsConfig: (config: Partial<FlagsConfig>) => void;
-}
+class StudentStore {
+  students: Student[] = [];
+  loading: boolean = false;
+  error: string | null = null;
 
-export const useStudentStore = create<StudentState>((set) => ({
-  students: [],
-  batchConfig: {
+  batchConfig: BatchConfig = {
     batches: ['BATCH01', 'BATCH02', 'BATCH03'],
     teachers: ['TEACHER1', 'TEACHER2', 'TEACHER3'],
     hostels: ['HOSTEL1', 'HOSTEL2', 'HOSTEL3'],
     programs: ['PROGRAM1', 'PROGRAM2', 'PROGRAM3'],
     streams: ['MEDICAL', 'ENGINEERING', 'FOUNDATION'],
-  },
-  remarksConfig: {
+  };
+
+  remarksConfig: RemarksConfig = {
     remarks: 'Remarks',
     remarks1: 'Remarks 1',
     remarks2: 'Remarks 2',
     remarks3: 'Remarks 3',
     remarks4: 'Remarks 4',
-  },
-  flagsConfig: {
+  };
+
+  flagsConfig: FlagsConfig = {
     flag1: 'Flag 1',
     flag2: 'Flag 2',
     flag3: 'Flag 3',
     flag4: 'Flag 4',
-  },
-  
-  addStudent: (student) => set((state) => {
-    // Check if student ID already exists
-    if (state.students.some(s => s.studentId === student.studentId)) {
-      alert(`Student with ID ${student.studentId} already exists!`);
-      return state;
+  };
+
+  constructor() {
+    makeAutoObservable(this);
+  }
+
+  async fetchStudents() {
+    this.loading = true;
+    this.error = null;
+    try {
+      const response = await axios.get('/api/students');
+      this.students = response.data;
+    } catch (error: any) {
+      this.error = error.message;
+    } finally {
+      this.loading = false;
     }
-    return { students: [...state.students, student] };
-  }),
-  
-  updateStudent: (studentId, updatedData) => set((state) => ({
-    students: state.students.map((student) => 
-      student.studentId === studentId 
-        ? { ...student, ...updatedData } 
-        : student
-    ),
-  })),
-  
-  deleteStudent: (studentId) => set((state) => ({
-    students: state.students.filter((student) => student.studentId !== studentId),
-  })),
-  
-  importStudents: (newStudents) => set((state) => {
-    // Filter out students with duplicate IDs
-    const existingIds = new Set(state.students.map(s => s.studentId));
-    const validNewStudents = newStudents.filter(student => {
-      if (existingIds.has(student.studentId)) {
-        console.warn(`Skipping duplicate student ID: ${student.studentId}`);
-        return false;
+  }
+
+  async addStudent(student: Student) {
+    this.loading = true;
+    this.error = null;
+    try {
+      const response = await axios.post('/api/students', student);
+      this.students.push(response.data);
+    } catch (error: any) {
+      this.error = error.message;
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  async updateStudent(id: string, student: Student) {
+    this.loading = true;
+    this.error = null;
+    try {
+      const response = await axios.put(`/api/students/${id}`, student);
+      const index = this.students.findIndex((s) => s.studentId === id);
+      if (index !== -1) {
+        this.students[index] = response.data;
       }
-      existingIds.add(student.studentId);
-      return true;
-    });
-    
-    return { students: [...state.students, ...validNewStudents] };
-  }),
-  
-  updateBatchConfig: (config) => set((state) => ({
-    batchConfig: { ...state.batchConfig, ...config },
-  })),
-  
-  updateRemarksConfig: (config) => set((state) => ({
-    remarksConfig: { ...state.remarksConfig, ...config },
-  })),
-  
-  updateFlagsConfig: (config) => set((state) => ({
-    flagsConfig: { ...state.flagsConfig, ...config },
-  })),
-}));
+    } catch (error: any) {
+      this.error = error.message;
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  async deleteStudent(id: string) {
+    this.loading = true;
+    this.error = null;
+    try {
+      await axios.delete(`/api/students/${id}`);
+      this.students = this.students.filter((s) => s.studentId !== id);
+    } catch (error: any) {
+      this.error = error.message;
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  updateBatchConfig(config: Partial<BatchConfig>) {
+    this.batchConfig = { ...this.batchConfig, ...config };
+  }
+
+  updateRemarksConfig(config: Partial<RemarksConfig>) {
+    this.remarksConfig = { ...this.remarksConfig, ...config };
+  }
+
+  updateFlagsConfig(config: Partial<FlagsConfig>) {
+    this.flagsConfig = { ...this.flagsConfig, ...config };
+  }
+
+  importStudents(students: Student[]) {
+    if (!students || students.length === 0) {
+      console.warn('No students to import');
+      return;
+    }
+    this.students = [...this.students, ...students];
+  }
+}
+
+export const studentStore = new StudentStore();
+
+export function useStudentStore() {
+  return studentStore;
+} 

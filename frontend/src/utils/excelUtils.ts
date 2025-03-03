@@ -4,9 +4,14 @@ import { Student } from '../types';
 // Convert Excel data to Student objects
 export const excelToStudents = (data: ArrayBuffer): Student[] => {
   const workbook = XLSX.read(data, { type: 'array' });
+  console.log('Sheet Names:', workbook.SheetNames);
   const worksheet = workbook.Sheets[workbook.SheetNames[0]];
   const jsonData = XLSX.utils.sheet_to_json(worksheet);
   
+  jsonData.forEach((row: any) => {
+    console.log('Excel Row:', row);
+  });
+
   return jsonData.map((row: any, index) => ({
     slNo: row['Sl No'] || index + 1,
     name: row['NAME'] || '',
@@ -15,8 +20,8 @@ export const excelToStudents = (data: ArrayBuffer): Student[] => {
     gender: row['GENDER'] || 'MALE',
     batch: row['BATCH'] || '',
     classTeacher: row['CLASS TEACHER'] || '',
-    hostel: row['Hostel'] || '',
-    stream: row['Stream'] || 'MEDICAL',
+    hostel: row['HOSTEL'] || '',
+    stream: row['STREAM'] || 'MEDICAL',
     program: row['PROGRAM'] || '',
     studyMaterial: row['Study Material'] || '',
     uniform: row['Uniform'] || '',

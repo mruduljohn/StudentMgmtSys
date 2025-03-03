@@ -10,10 +10,13 @@ const uploadExcel = async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
         }
+        console.log('File received:', req.file.originalname); // Debug log
 
         const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
         const sheet_name_list = workbook.SheetNames;
         const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]]);
+
+        console.log('Parsed data:', data); // Debug log
 
         for (const row of data) {
             const batch = await pool.query('SELECT value FROM configurable_options WHERE category = $1 AND value = $2 AND is_active = true', ['BATCH', row.BATCH]);

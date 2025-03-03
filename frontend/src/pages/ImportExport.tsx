@@ -6,7 +6,8 @@ import { useStudentStore } from '../store/studentStore';
 import { excelToStudents, studentsToExcel, downloadExcel } from '../utils/excelUtils';
 
 const ImportExport: React.FC = () => {
-  const { students, importStudents } = useStudentStore();
+  const studentStore = useStudentStore();
+  console.log('Store Students:', studentStore.students);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isUploading, setIsUploading] = useState(false);
@@ -44,7 +45,9 @@ const ImportExport: React.FC = () => {
             return;
           }
           
-          importStudents(parsedStudents);
+          console.log('Parsed students:', parsedStudents); // Debug log
+          console.log('First student:', parsedStudents[0]); // Debug log
+          studentStore.importStudents(parsedStudents);
           setUploadSuccess(`Successfully imported ${parsedStudents.length} students`);
         } catch (err) {
           console.error('Error parsing Excel file:', err);
@@ -72,13 +75,13 @@ const ImportExport: React.FC = () => {
   };
   
   const handleExport = () => {
-    if (students.length === 0) {
+    if (studentStore.students.length === 0) {
       alert('No students to export');
       return;
     }
     
     try {
-      const excelData = studentsToExcel(students);
+      const excelData = studentsToExcel(studentStore.students);
       downloadExcel(excelData, 'students_export.xlsx');
     } catch (err) {
       console.error('Error exporting to Excel:', err);
@@ -171,7 +174,7 @@ const ImportExport: React.FC = () => {
               variant="success"
               className="flex items-center"
               onClick={handleExport}
-              disabled={students.length === 0}
+              disabled={studentStore.students.length === 0}
             >
               <FileSpreadsheet size={16} className="mr-2" />
               Export to Excel
@@ -179,8 +182,8 @@ const ImportExport: React.FC = () => {
           </div>
           
           <div className="mt-4 text-sm text-gray-500">
-            <p>Total students: {students.length}</p>
-            {students.length === 0 && (
+            <p>Total students: {studentStore.students.length}</p>
+            {studentStore.students.length === 0 && (
               <p className="text-yellow-600 mt-2">
                 No students to export. Import students first.
               </p>
