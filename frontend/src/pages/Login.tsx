@@ -2,31 +2,28 @@ import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { User, Lock } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useStudentStore } from '../store/studentStore';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   
-  const { login, isAuthenticated } = useAuthStore();
+  const { login, isAuthenticated, loading, error } = useAuthStore();
+  const studentStore = useStudentStore();
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
+    const success = await login(username, password);
     
-    try {
-      const success = await login(email, password);
-      if (!success) {
-        setError('Invalid email or password');
+    if (success) {
+      // Initialize student store after successful login
+      try {
+        await studentStore.init();
+      } catch (error) {
+        console.error("Failed to initialize student store after login:", error);
       }
-    } catch (err) {
-      setError('An error occurred during login');
-    } finally {
-      setIsLoading(false);
     }
   };
   
@@ -55,17 +52,17 @@ const Login: React.FC = () => {
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label className="block text-gray-700 text-sm font-bold mb-2">
-                Email
+                Username
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your username"
                   className="pl-10"
                   fullWidth
                   required
@@ -97,16 +94,15 @@ const Login: React.FC = () => {
               type="submit"
               variant="primary"
               fullWidth
-              disabled={isLoading}
+              disabled={loading}
             >
-              {isLoading ? 'Logging in...' : 'Login'}
+              {loading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
           
           <div className="mt-4 text-center text-sm text-gray-600">
-            <p>Demo Accounts:</p>
-            <p>Admin: admin@example.com / password</p>
-            <p>Mentor: mentor1@example.com / password</p>
+            <p>Default Admin Account:</p>
+            <p>Username: admin / Password: admin123</p>
           </div>
         </div>
       </div>

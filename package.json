@@ -1,0 +1,12 @@
+{
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/mongoose": "^5.11.97"
+  },
+  "dependencies": {
+    "@types/recharts": "^1.8.29",
+    "axios": "^1.8.2",
+    "recharts": "^2.15.1"
+  }
+}

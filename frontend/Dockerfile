@@ -1,32 +1,33 @@
-# Use the official Node.js image as the base image
-FROM node:23-alpine3.20 AS build
+# Stage 1: Build the app
+FROM node:18-alpine AS build
 
-# Set the working directory
+# Set working directory
 WORKDIR /app
 
-# Copy the package.json and package-lock.json files
-COPY package.json package-lock.json ./
+# Copy package files
+COPY package*.json ./
 
-# Install the dependencies
-RUN npm install
+# Install dependencies
+RUN npm ci
 
-# Copy the rest of the application code
+# Copy all project files
 COPY . .
 
-# Build the application
+# Make sure PostCSS and Tailwind configs are properly processed
+RUN npx tailwindcss -i ./src/index.css -o ./src/tailwind.css
 RUN npm run build
 
-# Use the official nginx image to serve the application
+# Stage 2: Serve the app with Nginx
 FROM nginx:alpine
 
-# Copy the built application from the previous stage
+# Copy the built app to Nginx serve directory
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy custom nginx configuration
+# Copy Nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80
 EXPOSE 80
 
-# Start nginx
+# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]

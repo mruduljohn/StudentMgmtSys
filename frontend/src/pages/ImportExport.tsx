@@ -3,11 +3,10 @@ import { Upload, Download, FileSpreadsheet, AlertCircle } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/ui/Button';
 import { useStudentStore } from '../store/studentStore';
-import { excelToStudents, studentsToExcel, downloadExcel } from '../utils/excelUtils';
+import { studentsToExcel, downloadExcel } from '../utils/excelUtils';
 
 const ImportExport: React.FC = () => {
   const studentStore = useStudentStore();
-  console.log('Store Students:', studentStore.students);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isUploading, setIsUploading] = useState(false);
@@ -23,65 +22,34 @@ const ImportExport: React.FC = () => {
     setUploadSuccess(null);
     
     try {
-      const reader = new FileReader();
+      // Use the uploadCSV method from studentStore
+      const result = await studentStore.uploadCSV(file);
       
-      reader.onload = (event) => {
-        try {
-          const data = event.target?.result as ArrayBuffer;
-          const parsedStudents = excelToStudents(data);
-          
-          if (parsedStudents.length === 0) {
-            setUploadError('No student data found in the file');
-            return;
-          }
-          
-          // Check for required fields
-          const missingFields = parsedStudents.some(
-            student => !student.name || !student.studentId
-          );
-          
-          if (missingFields) {
-            setUploadError('Some students are missing required fields (Name or Student ID)');
-            return;
-          }
-          
-          console.log('Parsed students:', parsedStudents); // Debug log
-          console.log('First student:', parsedStudents[0]); // Debug log
-          studentStore.importStudents(parsedStudents);
-          setUploadSuccess(`Successfully imported ${parsedStudents.length} students`);
-        } catch (err) {
-          console.error('Error parsing Excel file:', err);
-          setUploadError('Failed to parse the Excel file. Please check the format.');
-        } finally {
-          setIsUploading(false);
-          // Reset file input
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-        }
-      };
-      
-      reader.onerror = () => {
-        setUploadError('Error reading the file');
-        setIsUploading(false);
-      };
-      
-      reader.readAsArrayBuffer(file);
+      if (result && result.results) {
+        setUploadSuccess(`Successfully processed ${result.results.successful} students (${result.results.failed} failed)`);
+      } else {
+        setUploadError('Failed to upload file');
+      }
     } catch (err) {
-      console.error('Error handling file:', err);
+      console.error('Error uploading file:', err);
       setUploadError('An unexpected error occurred');
+    } finally {
       setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
   
   const handleExport = () => {
-    if (studentStore.students.length === 0) {
+    if (studentStore.getStudents.length === 0) {
       alert('No students to export');
       return;
     }
     
     try {
-      const excelData = studentsToExcel(studentStore.students);
+      const excelData = studentsToExcel(studentStore.getStudents);
       downloadExcel(excelData, 'students_export.xlsx');
     } catch (err) {
       console.error('Error exporting to Excel:', err);
@@ -127,7 +95,7 @@ const ImportExport: React.FC = () => {
             <input
               type="file"
               ref={fileInputRef}
-              accept=".xlsx,.xls"
+              accept=".xlsx,.xls,.csv"
               onChange={handleFileChange}
               className="hidden"
               id="file-upload"
@@ -151,7 +119,7 @@ const ImportExport: React.FC = () => {
               <li>NAME - Student name</li>
               <li>STUDENT ID - Unique identifier</li>
               <li>PHONE NUMBER - Contact number</li>
-              <li>GENDER - MALE/FEMALE/DIFFERENT</li>
+              <li>GENDER - M/F/DIFFERENT</li>
               <li>BATCH - Class batch</li>
               <li>And other fields as needed</li>
             </ul>
@@ -174,7 +142,7 @@ const ImportExport: React.FC = () => {
               variant="success"
               className="flex items-center"
               onClick={handleExport}
-              disabled={studentStore.students.length === 0}
+              disabled={studentStore.getStudents.length === 0}
             >
               <FileSpreadsheet size={16} className="mr-2" />
               Export to Excel
@@ -182,8 +150,8 @@ const ImportExport: React.FC = () => {
           </div>
           
           <div className="mt-4 text-sm text-gray-500">
-            <p>Total students: {studentStore.students.length}</p>
-            {studentStore.students.length === 0 && (
+            <p>Total students: {studentStore.getStudents.length}</p>
+            {studentStore.getStudents.length === 0 && (
               <p className="text-yellow-600 mt-2">
                 No students to export. Import students first.
               </p>

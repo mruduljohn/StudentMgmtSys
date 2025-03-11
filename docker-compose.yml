@@ -1,34 +1,74 @@
-
+x-environment:
+  DOCKER_BUILDKIT: 1
 services:
-  backend:
-    build: ./backend
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./backend:/usr/src/app
-    depends_on:
-      - db
-    environment:
-      - DB_HOST=db
-      - DB_USER=postgres
-      - DB_PASS=password
-      - DB_NAME=student_management
-      - PORT=5000
-      - SECRET_KEY=tienomaryelawshoecowsivybeetoes
   frontend:
     build: ./frontend
+    container_name: student-frontend
     ports:
       - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
     depends_on:
       - backend
-  db:
-    image: postgres:latest
+    networks:
+      - student-network
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: student-backend
+    ports:
+      - "5000:5000"
     environment:
-      POSTGRES_DB: student_management
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      MONGO_URI: mongodb://${MONGO_ROOT_USER:-root}:${MONGO_ROOT_PASSWORD:-rootpassword}@mongo:27017/studentdb?authSource=admin
+      JWT_SECRET: ${JWT_SECRET:-mrudul_mathews_nani}
+      NODE_ENV: production
+      PORT: 5000
+      CORS_ORIGIN: http://localhost:3000
+    depends_on:
+      - mongo
     volumes:
-      - db_data:/var/lib/postgresql/data
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./backend/src:/app/src
+      - backend_uploads:/app/dist/uploads
+    networks:
+      - student-network
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:latest
+    container_name: student-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - student-network
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-rootpassword}
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: student-mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USER:-root}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD:-rootpassword}
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin123}
+    depends_on:
+      - mongo
+    networks:
+      - student-network
+    restart: unless-stopped
+
+networks:
+  student-network:
+    driver: bridge
+
 volumes:
-  db_data:
+  mongodb_data:
+  backend_uploads:

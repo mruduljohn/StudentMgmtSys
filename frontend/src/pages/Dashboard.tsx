@@ -1,9 +1,12 @@
-import React from 'react';
-import { Users, UserCog, FileSpreadsheet, BookOpen } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { observer } from 'mobx-react-lite';
+import { Users, UserCog, FileSpreadsheet, BookOpen, School, Home, BookX, ShoppingBag, CreditCard, Tablet, AlertTriangle } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useStudentStore } from '../store/studentStore';
 import { useMentorStore } from '../store/mentorStore';
 import { useAuthStore } from '../store/authStore';
+import { Student } from '../types';
+import { Link } from 'react-router-dom';
 
 const DashboardCard: React.FC<{
   title: string;
@@ -24,21 +27,75 @@ const DashboardCard: React.FC<{
   </div>
 );
 
-const Dashboard: React.FC = () => {
-  const { students } = useStudentStore();
+const Dashboard: React.FC = observer(() => {
+  const studentStore = useStudentStore();
   const { mentors } = useMentorStore();
   const { user } = useAuthStore();
+  const [loading, setLoading] = useState(true);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
   
-  const isAdmin = user?.role === 'admin';
+  // Initialize stores
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        await studentStore.init();
+        setAllStudents(studentStore.getAllStudents);
+        setLoading(false);
+      } catch (error) {
+        console.error("Failed to initialize stores:", error);
+        setLoading(false);
+      }
+    };
+    
+    initializeData();
+  }, [studentStore]);
   
-  // For mentors, filter students to only show those in their class
-  const filteredStudents = isAdmin 
-    ? students 
-    : students.filter(student => student.batch === user?.class);
+  const isAdmin = user?.role === 'ADMIN';
   
   // Count students by status
-  const joinedStudents = filteredStudents.filter(s => s.joined === 'JOINED').length;
-  const allotedStudents = filteredStudents.filter(s => s.joined === 'ALLOTED').length;
+  const joinedStudents = allStudents.filter(s => s.joined === 'JOINED').length;
+  const allotedStudents = allStudents.filter(s => s.joined === 'ALLOTED').length;
+  const joiningStudents = allStudents.filter(s => s.joined && s.joined.includes('JOINING SOON')).length;
+  const notJoiningStudents = allStudents.filter(s => s.joined === 'NOT JOINING').length;
+  const centrechangedStudents = allStudents.filter(s => s.joined && s.joined.includes('CENTRE CHANGE')).length;
+  
+  // Count students with dues
+  const studyMaterialDue = allStudents.filter(s => 
+    s.studyMaterial === 'NOT RECEIVED' || s.studyMaterial === 'PARTIALLY RECEIVED'
+  ).length;
+  
+  const uniformDue = allStudents.filter(s => 
+    s.uniform === 'NOT RECEIVED' || s.uniform === 'PARTIALLY RECEIVED'
+  ).length;
+  
+  const idCardDue = allStudents.filter(s => 
+    s.idCard === 'NOT RECEIVED'
+  ).length;
+  
+  const tabDue = allStudents.filter(s => 
+    s.tab === 'REQUESTED NOT PAID' || s.tab === 'REQUESTED PAID'
+  ).length;
+  
+  const feeDue = allStudents.filter(s => s.feeDue > 0).length;
+  
+  // Count students by hostel type
+  const dayScholars = allStudents.filter(s => s.hostel === 'DAY SCHOLAR' || s.hostel === 'DS').length;
+  const hostelers = allStudents.length - dayScholars;
+  
+  // For mentors, also count students in their class
+  const mentorClassStudents = !isAdmin && user?.class 
+    ? allStudents.filter(student => student.classTeacher === user.name)
+    : [];
+  
+  if (loading || studentStore.isLoading) {
+    return (
+      <Layout>
+        <div className="p-4 text-center">
+          <div className="text-lg">Loading dashboard data...</div>
+        </div>
+      </Layout>
+    );
+  }
   
   return (
     <Layout>
@@ -49,10 +106,11 @@ const Dashboard: React.FC = () => {
         </p>
       </div>
       
+      {/* Main statistics cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <DashboardCard
           title="Total Students"
-          value={filteredStudents.length}
+          value={allStudents.length}
           icon={<Users size={24} />}
           color="bg-blue-500"
         />
@@ -71,95 +129,175 @@ const Dashboard: React.FC = () => {
           color="bg-yellow-500"
         />
         
-        {isAdmin && (
+        {isAdmin ? (
           <DashboardCard
             title="Total Mentors"
             value={mentors.length}
             icon={<UserCog size={24} />}
             color="bg-purple-500"
           />
+        ) : (
+          <DashboardCard
+            title="My Students"
+            value={mentorClassStudents.length}
+            icon={<UserCog size={24} />}
+            color="bg-purple-500"
+          />
         )}
       </div>
       
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-lg font-semibold mb-4">Quick Stats</h2>
+      {/* Additional statistics cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <DashboardCard
+          title="Day Scholars"
+          value={dayScholars}
+          icon={<School size={24} />}
+          color="bg-indigo-500"
+        />
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="border rounded-lg p-4">
-            <h3 className="font-medium text-gray-700">Students by Stream</h3>
-            <ul className="mt-2 space-y-1">
-              <li className="flex justify-between">
-                <span>Medical</span>
-                <span className="font-medium">
-                  {filteredStudents.filter(s => s.stream === 'MEDICAL').length}
-                </span>
-              </li>
-              <li className="flex justify-between">
-                <span>Engineering</span>
-                <span className="font-medium">
-                  {filteredStudents.filter(s => s.stream === 'ENGINEERING').length}
-                </span>
-              </li>
-              <li className="flex justify-between">
-                <span>Foundation</span>
-                <span className="font-medium">
-                  {filteredStudents.filter(s => s.stream === 'FOUNDATION').length}
-                </span>
-              </li>
-            </ul>
-          </div>
-          
-          <div className="border rounded-lg p-4">
-            <h3 className="font-medium text-gray-700">Students by Syllabus</h3>
-            <ul className="mt-2 space-y-1">
-              <li className="flex justify-between">
-                <span>State</span>
-                <span className="font-medium">
-                  {filteredStudents.filter(s => s.syllabus === 'STATE').length}
-                </span>
-              </li>
-              <li className="flex justify-between">
-                <span>CBSE</span>
-                <span className="font-medium">
-                  {filteredStudents.filter(s => s.syllabus === 'CBSE').length}
-                </span>
-              </li>
-              <li className="flex justify-between">
-                <span>ICSC</span>
-                <span className="font-medium">
-                  {filteredStudents.filter(s => s.syllabus === 'ICSC').length}
-                </span>
-              </li>
-            </ul>
-          </div>
-          
-          <div className="border rounded-lg p-4">
-            <h3 className="font-medium text-gray-700">Students by Gender</h3>
-            <ul className="mt-2 space-y-1">
-              <li className="flex justify-between">
-                <span>Male</span>
-                <span className="font-medium">
-                  {filteredStudents.filter(s => s.gender === 'MALE').length}
-                </span>
-              </li>
-              <li className="flex justify-between">
-                <span>Female</span>
-                <span className="font-medium">
-                  {filteredStudents.filter(s => s.gender === 'FEMALE').length}
-                </span>
-              </li>
-              <li className="flex justify-between">
-                <span>Different</span>
-                <span className="font-medium">
-                  {filteredStudents.filter(s => s.gender === 'DIFFERENT').length}
-                </span>
-              </li>
-            </ul>
-          </div>
+        <DashboardCard
+          title="Hostelers"
+          value={hostelers}
+          icon={<Home size={24} />}
+          color="bg-pink-500"
+        />
+        
+        <DashboardCard
+          title="Joining Soon"
+          value={joiningStudents}
+          icon={<FileSpreadsheet size={24} />}
+          color="bg-amber-500"
+        />
+        <DashboardCard
+          title="Not Joining"
+          value={notJoiningStudents}
+          icon={<FileSpreadsheet size={24} />}
+          color="bg-amber-500"
+        />
+        <DashboardCard
+          title="Centre Changed"
+          value={centrechangedStudents}
+          icon={<BookX size={24} />}
+          color="bg-red-500"
+        />
+      </div>
+      
+      {/* Due items statistics */}
+      <h2 className="text-xl font-semibold mb-4">Due Items</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <DashboardCard
+          title="Study Material Due"
+          value={studyMaterialDue}
+          icon={<BookOpen size={24} />}
+          color="bg-orange-500"
+        />
+        
+        <DashboardCard
+          title="Uniform Due"
+          value={uniformDue}
+          icon={<ShoppingBag size={24} />}
+          color="bg-emerald-500"
+        />
+        
+        <DashboardCard
+          title="ID Card Due"
+          value={idCardDue}
+          icon={<CreditCard size={24} />}
+          color="bg-cyan-500"
+        />
+        
+        <DashboardCard
+          title="Tab Due"
+          value={tabDue}
+          icon={<Tablet size={24} />}
+          color="bg-violet-500"
+        />
+        
+        <DashboardCard
+          title="Fee Due"
+          value={feeDue}
+          icon={<AlertTriangle size={24} />}
+          color="bg-rose-500"
+        />
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-lg font-semibold mb-4">Student Statistics</h2>
+          {studentStore.getStats ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-500 text-sm">Average NEET Score</p>
+                  <p className="text-xl font-bold">{studentStore.getStats.averageNeetScore || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-sm">Average +2 Percentage</p>
+                  <p className="text-xl font-bold">{studentStore.getStats.averagePlus2Percentage || 'N/A'}%</p>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-gray-500 text-sm">Fee Due Count</p>
+                <p className="text-xl font-bold">{studentStore.getStats.feeDueCount || 0} students</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-500">No statistics available</p>
+          )}
         </div>
+        
+        {!isAdmin && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold mb-4">My Class Students</h2>
+            {mentorClassStudents.length > 0 ? (
+              <div>
+                <p className="text-gray-600 mb-2">You are assigned as the class teacher for {mentorClassStudents.length} students.</p>
+                <p className="text-gray-600">You can edit all details except Student ID for these students.</p>
+              </div>
+            ) : (
+              <p className="text-gray-500">You are not assigned as a class teacher for any students yet.</p>
+            )}
+          </div>
+        )}
+        
+        {isAdmin && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold mb-4">Quick Links</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <Link to="/analytics" className="bg-blue-50 hover:bg-blue-100 p-4 rounded-lg flex items-center">
+                <div className="p-2 rounded-full bg-blue-500 text-white mr-3">
+                  <FileSpreadsheet size={20} />
+                </div>
+                <span className="font-medium">Analytics</span>
+              </Link>
+              
+              <Link to="/audit-logs" className="bg-purple-50 hover:bg-purple-100 p-4 rounded-lg flex items-center">
+                <div className="p-2 rounded-full bg-purple-500 text-white mr-3">
+                  <FileSpreadsheet size={20} />
+                </div>
+                <span className="font-medium">Audit Logs</span>
+              </Link>
+              
+              <Link to="/settings" className="bg-green-50 hover:bg-green-100 p-4 rounded-lg flex items-center">
+                <div className="p-2 rounded-full bg-green-500 text-white mr-3">
+                  <FileSpreadsheet size={20} />
+                </div>
+                <span className="font-medium">Settings</span>
+              </Link>
+              
+              <Link to="/import-export" className="bg-amber-50 hover:bg-amber-100 p-4 rounded-lg flex items-center">
+                <div className="p-2 rounded-full bg-amber-500 text-white mr-3">
+                  <FileSpreadsheet size={20} />
+                </div>
+                <span className="font-medium">Import/Export</span>
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
-};
+});
 
 export default Dashboard;

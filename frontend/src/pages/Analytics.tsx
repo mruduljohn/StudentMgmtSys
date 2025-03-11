@@ -1,0 +1,556 @@
+import React, { useState, useEffect } from 'react';
+import { observer } from 'mobx-react-lite';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import Layout from '../components/layout/Layout';
+import { useStudentStore } from '../store/studentStore';
+
+interface BatchSummary {
+  batch: string;
+  classTeacher: string;
+  strength: number;
+  studyMaterialDue: number;
+  uniformDue: number;
+  idCardDue: number;
+  tabDue: number;
+  feeDue: number;
+}
+
+interface HostelSummary {
+  hostel: string;
+  totalCapacity: number;
+  filled: number;
+  vacancy: number;
+  batches: Record<string, number>;
+}
+
+// Define colors for charts
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658'];
+
+const Analytics: React.FC = observer(() => {
+  const studentStore = useStudentStore();
+  const [loading, setLoading] = useState(true);
+  const [batchSummaries, setBatchSummaries] = useState<BatchSummary[]>([]);
+  const [hostelSummaries, setHostelSummaries] = useState<HostelSummary[]>([]);
+  const [genderSummary, setGenderSummary] = useState<{
+    hostelers: { boys: number; girls: number };
+    dayScholars: { boys: number; girls: number };
+  }>({
+    hostelers: { boys: 0, girls: 0 },
+    dayScholars: { boys: 0, girls: 0 },
+  });
+  
+  // Define hostel capacities (this would ideally come from an API or configuration)
+  const hostelCapacities: Record<string, number> = {
+    'ST.ANNS': 65,
+    'MARIGOLD GRAND': 70,
+    'ST.JOHNS': 42,
+    'THE GUARDIAN': 73,
+    'NEST GRAND': 121,
+    'LAVERNA': 48,
+    'B MADONA': 53,
+    'B MARTHOMA': 59,
+    'B ST.MARYS': 77,
+    'PETER CLAVER': 38,
+    'LITTLE FLOWER': 72,
+    'ST.AUGUSTINE': 46,
+  };
+  
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        if (!studentStore.isDataLoaded) {
+          await studentStore.init();
+        }
+        
+        const allStudents = studentStore.getAllStudents;
+        
+        // Process batch summaries
+        const batchMap = new Map<string, BatchSummary>();
+        
+        allStudents.forEach(student => {
+          if (!student.batch) return;
+          
+          if (!batchMap.has(student.batch)) {
+            batchMap.set(student.batch, {
+              batch: student.batch,
+              classTeacher: student.classTeacher || 'Not Assigned',
+              strength: 0,
+              studyMaterialDue: 0,
+              uniformDue: 0,
+              idCardDue: 0,
+              tabDue: 0,
+              feeDue: 0,
+            });
+          }
+          
+          const summary = batchMap.get(student.batch)!;
+          summary.strength++;
+          
+          if (student.studyMaterial === 'NOT RECEIVED' || student.studyMaterial === 'PARTIALLY RECEIVED') {
+            summary.studyMaterialDue++;
+          }
+          
+          if (student.uniform === 'NOT RECEIVED' || student.uniform === 'PARTIALLY RECEIVED') {
+            summary.uniformDue++;
+          }
+          
+          if (student.idCard === 'NOT RECEIVED') {
+            summary.idCardDue++;
+          }
+          
+          if (student.tab === 'REQUESTED NOT PAID' || student.tab === 'REQUESTED PAID') {
+            summary.tabDue++;
+          }
+          
+          if (student.feeDue > 0) {
+            summary.feeDue++;
+          }
+        });
+        
+        // Sort batch summaries by batch name
+        const sortedBatchSummaries = Array.from(batchMap.values()).sort((a, b) => 
+          a.batch.localeCompare(b.batch)
+        );
+        
+        setBatchSummaries(sortedBatchSummaries);
+        
+        // Process hostel summaries
+        const hostelMap = new Map<string, HostelSummary>();
+        const batchesSet = new Set<string>(allStudents.map(s => s.batch).filter(Boolean));
+        
+        // Initialize hostel summaries
+        Object.keys(hostelCapacities).forEach(hostel => {
+          const batchCounts: Record<string, number> = {};
+          batchesSet.forEach(batch => {
+            batchCounts[batch as string] = 0;
+          });
+          
+          hostelMap.set(hostel, {
+            hostel,
+            totalCapacity: hostelCapacities[hostel] || 0,
+            filled: 0,
+            vacancy: hostelCapacities[hostel] || 0,
+            batches: batchCounts,
+          });
+        });
+        
+        // Add day scholar option
+        const dayScholarBatchCounts: Record<string, number> = {};
+        batchesSet.forEach(batch => {
+          dayScholarBatchCounts[batch as string] = 0;
+        });
+        
+        hostelMap.set('DAY SCHOLAR', {
+          hostel: 'DAY SCHOLAR',
+          totalCapacity: 0, // No capacity limit for day scholars
+          filled: 0,
+          vacancy: 0,
+          batches: dayScholarBatchCounts,
+        });
+        
+        // Count students by hostel and batch
+        allStudents.forEach(student => {
+          if (!student.hostel || !student.batch) return;
+          
+          const hostelName = student.hostel === 'DS' ? 'DAY SCHOLAR' : student.hostel;
+          
+          if (!hostelMap.has(hostelName)) {
+            // Handle hostels not in the predefined list
+            const batchCounts: Record<string, number> = {};
+            batchesSet.forEach(batch => {
+              batchCounts[batch as string] = 0;
+            });
+            
+            hostelMap.set(hostelName, {
+              hostel: hostelName,
+              totalCapacity: 0, // Unknown capacity
+              filled: 0,
+              vacancy: 0,
+              batches: batchCounts,
+            });
+          }
+          
+          const summary = hostelMap.get(hostelName)!;
+          summary.filled++;
+          if (summary.totalCapacity > 0) {
+            summary.vacancy = summary.totalCapacity - summary.filled;
+          }
+          
+          if (student.batch && summary.batches[student.batch] !== undefined) {
+            summary.batches[student.batch]++;
+          }
+        });
+        
+        // Sort hostel summaries, but put DAY SCHOLAR first
+        const sortedHostelSummaries = Array.from(hostelMap.values()).sort((a, b) => {
+          if (a.hostel === 'DAY SCHOLAR') return -1;
+          if (b.hostel === 'DAY SCHOLAR') return 1;
+          return a.hostel.localeCompare(b.hostel);
+        });
+        
+        setHostelSummaries(sortedHostelSummaries);
+        
+        // Process gender summary
+        const genderSummary = {
+          hostelers: { boys: 0, girls: 0 },
+          dayScholars: { boys: 0, girls: 0 },
+        };
+        
+        allStudents.forEach(student => {
+          if (!student.hostel || !student.gender) return;
+          
+          const isDayScholar = student.hostel === 'DS' || student.hostel === 'DAY SCHOLAR';
+          const isMale = student.gender === 'M';
+          
+          if (isDayScholar) {
+            if (isMale) {
+              genderSummary.dayScholars.boys++;
+            } else {
+              genderSummary.dayScholars.girls++;
+            }
+          } else {
+            if (isMale) {
+              genderSummary.hostelers.boys++;
+            } else {
+              genderSummary.hostelers.girls++;
+            }
+          }
+        });
+        
+        setGenderSummary(genderSummary);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error initializing analytics data:', error);
+        setLoading(false);
+      }
+    };
+    
+    initializeData();
+  }, [studentStore]);
+  
+  // Prepare data for charts
+  const batchStrengthData = batchSummaries.slice(0, 10).map(summary => ({
+    name: summary.batch,
+    Students: summary.strength,
+    'Fee Due': summary.feeDue,
+  }));
+  
+  const genderData = [
+    { name: 'Boys', value: genderSummary.hostelers.boys + genderSummary.dayScholars.boys },
+    { name: 'Girls', value: genderSummary.hostelers.girls + genderSummary.dayScholars.girls },
+  ];
+  
+  const accommodationData = [
+    { name: 'Day Scholars', value: genderSummary.dayScholars.boys + genderSummary.dayScholars.girls },
+    { name: 'Hostelers', value: genderSummary.hostelers.boys + genderSummary.hostelers.girls },
+  ];
+  
+  if (loading) {
+    return (
+      <Layout>
+        <div className="p-4 text-center">
+          <div className="text-lg">Loading analytics data...</div>
+        </div>
+      </Layout>
+    );
+  }
+  
+  return (
+    <Layout>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Analytics</h1>
+        <p className="text-gray-600">
+          Detailed statistics and analytics for students
+        </p>
+      </div>
+      
+      {/* Overview Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h2 className="text-lg font-semibold mb-4">Gender Distribution</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={genderData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                outerRadius={100}
+                fill="#8884d8"
+                dataKey="value"
+                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+              >
+                {genderData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => [`${value} students`, 'Count']} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h2 className="text-lg font-semibold mb-4">Accommodation Distribution</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={accommodationData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                outerRadius={100}
+                fill="#8884d8"
+                dataKey="value"
+                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+              >
+                {accommodationData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => [`${value} students`, 'Count']} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+      
+      {/* Batch Strength Chart */}
+      <div className="bg-white p-4 rounded-lg shadow mb-8">
+        <h2 className="text-lg font-semibold mb-4">Batch Strength Comparison (Top 10 Batches)</h2>
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart
+            data={batchStrengthData}
+            margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="Students" name="Student Count" fill="#8884d8" />
+            <Bar dataKey="Fee Due" name="Fee Due" fill="#82ca9d" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      
+      {/* Batch Summary Table */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Batch Summary</h2>
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Batch
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Class Teacher
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Strength
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Study Material Due
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Uniform Due
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ID Card Due
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tab Due
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Fee Due
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {batchSummaries.map((summary) => (
+                <tr key={summary.batch}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {summary.batch}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {summary.classTeacher}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {summary.strength}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {summary.studyMaterialDue}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {summary.uniformDue}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {summary.idCardDue}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {summary.tabDue}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {summary.feeDue}
+                  </td>
+                </tr>
+              ))}
+              {/* Total row */}
+              <tr className="bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  Total
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  -
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  {batchSummaries.reduce((sum, summary) => sum + summary.strength, 0)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  {batchSummaries.reduce((sum, summary) => sum + summary.studyMaterialDue, 0)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  {batchSummaries.reduce((sum, summary) => sum + summary.uniformDue, 0)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  {batchSummaries.reduce((sum, summary) => sum + summary.idCardDue, 0)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  {batchSummaries.reduce((sum, summary) => sum + summary.tabDue, 0)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  {batchSummaries.reduce((sum, summary) => sum + summary.feeDue, 0)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      {/* Hostel Summary Table */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Hostel Allocation</h2>
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Hostel
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total Capacity
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Filled
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Vacancy
+                </th>
+                {/* Render batch columns - limit to 5 for space */}
+                {hostelSummaries.length > 0 && Object.keys(hostelSummaries[0].batches).slice(0, 5).map(batch => (
+                  <th key={batch} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {batch}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {hostelSummaries.map((summary) => (
+                <tr key={summary.hostel}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {summary.hostel}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {summary.totalCapacity || 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {summary.filled}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {summary.totalCapacity ? summary.vacancy : 'N/A'}
+                  </td>
+                  {/* Render batch counts - limit to 5 for space */}
+                  {Object.keys(summary.batches).slice(0, 5).map(batch => (
+                    <td key={batch} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {summary.batches[batch]}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {/* Total row */}
+              <tr className="bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  Total
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  {hostelSummaries.reduce((sum, summary) => sum + (summary.totalCapacity || 0), 0)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  {hostelSummaries.reduce((sum, summary) => sum + summary.filled, 0)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  {hostelSummaries.reduce((sum, summary) => sum + (summary.vacancy || 0), 0)}
+                </td>
+                {/* Total for each batch column */}
+                {hostelSummaries.length > 0 && Object.keys(hostelSummaries[0].batches).slice(0, 5).map(batch => (
+                  <td key={batch} className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    {hostelSummaries.reduce((sum, summary) => sum + (summary.batches[batch] || 0), 0)}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      {/* Gender Summary */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Gender Distribution</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium mb-4">Hostelers</h3>
+            <div className="flex justify-around">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-blue-600">{genderSummary.hostelers.boys}</div>
+                <div className="text-gray-500">Boys</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-pink-600">{genderSummary.hostelers.girls}</div>
+                <div className="text-gray-500">Girls</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-purple-600">
+                  {genderSummary.hostelers.boys + genderSummary.hostelers.girls}
+                </div>
+                <div className="text-gray-500">Total</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium mb-4">Day Scholars</h3>
+            <div className="flex justify-around">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-blue-600">{genderSummary.dayScholars.boys}</div>
+                <div className="text-gray-500">Boys</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-pink-600">{genderSummary.dayScholars.girls}</div>
+                <div className="text-gray-500">Girls</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-purple-600">
+                  {genderSummary.dayScholars.boys + genderSummary.dayScholars.girls}
+                </div>
+                <div className="text-gray-500">Total</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+});
+
+export default Analytics; 

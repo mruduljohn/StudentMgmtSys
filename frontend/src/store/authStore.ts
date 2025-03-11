@@ -1,57 +1,100 @@
 import { create } from 'zustand';
-import { User, UserRole } from '../types';
+import { User } from '../types';
+import { login as apiLogin, logout as apiLogout, getCurrentUser } from '../api';
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  loading: boolean;
+  error: string | null;
+  login: (username: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  checkAuth: () => Promise<boolean>;
 }
 
-// In a real application, this would be fetched from a backend
-const MOCK_USERS: User[] = [
-  {
-    id: '1',
-    name: 'Admin User',
-    email: 'admin@example.com',
-    role: 'admin',
-  },
-  {
-    id: '2',
-    name: 'Mentor One',
-    email: 'mentor1@example.com',
-    role: 'mentor',
-    class: 'BATCH01',
-  },
-  {
-    id: '3',
-    name: 'Mentor Two',
-    email: 'mentor2@example.com',
-    role: 'mentor',
-    class: 'BATCH02',
-  },
-];
-
-// For demo purposes, all passwords are 'password'
-const PASSWORD = 'password';
-
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
-  login: async (email: string, password: string) => {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  loading: false,
+  error: null,
+  
+  login: async (username: string, password: string) => {
+    set({ loading: true, error: null });
     
-    const user = MOCK_USERS.find((u) => u.email === email);
-    
-    if (user && password === PASSWORD) {
-      set({ user, isAuthenticated: true });
-      return true;
+    try {
+      const response = await apiLogin({ username, password });
+      
+      if (response.token && response.user) {
+        set({ 
+          user: response.user, 
+          isAuthenticated: true, 
+          loading: false 
+        });
+        return true;
+      } else {
+        set({ 
+          error: 'Invalid response from server', 
+          loading: false 
+        });
+        return false;
+      }
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Login failed', 
+        loading: false 
+      });
+      return false;
     }
+  },
+  
+  logout: async () => {
+    set({ loading: true });
     
-    return false;
+    try {
+      await apiLogout();
+      set({ 
+        user: null, 
+        isAuthenticated: false, 
+        loading: false 
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still clear the user state even if the API call fails
+      set({ 
+        user: null, 
+        isAuthenticated: false, 
+        loading: false 
+      });
+    }
   },
-  logout: () => {
-    set({ user: null, isAuthenticated: false });
-  },
+  
+  checkAuth: async () => {
+    // Skip if already authenticated
+    if (get().isAuthenticated) return true;
+    
+    // Check if token exists in localStorage
+    const token = localStorage.getItem('token');
+    if (!token) return false;
+    
+    set({ loading: true });
+    
+    try {
+      const user = await getCurrentUser();
+      set({ 
+        user, 
+        isAuthenticated: true, 
+        loading: false 
+      });
+      return true;
+    } catch {
+      // Clear token if invalid
+      localStorage.removeItem('token');
+      set({ 
+        user: null, 
+        isAuthenticated: false, 
+        loading: false 
+      });
+      return false;
+    }
+  }
 }));

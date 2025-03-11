@@ -18,9 +18,9 @@ const StudentForm: React.FC<StudentFormProps> = ({
   onClose,
   mode,
 }) => {
-  const { addStudent, updateStudent, batchConfig } = useStudentStore();
+  const { addStudent, updateStudent, batchConfig, fetchAllConfigs } = useStudentStore();
   const { user } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'ADMIN';
   
   const [formData, setFormData] = useState<Partial<Student>>(
     student || {
@@ -28,7 +28,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
       name: '',
       studentId: '',
       phoneNumber: '',
-      gender: 'MALE',
+      gender: 'M',
       batch: '',
       classTeacher: '',
       hostel: '',
@@ -112,18 +112,69 @@ const StudentForm: React.FC<StudentFormProps> = ({
     return Object.keys(newErrors).length === 0;
   };
   
+  // Add a function to map display values to backend values
+  const getDisplayValue = (field: string, value: string): string => {
+    // Map gender values
+    if (field === 'gender') {
+      if (value === 'MALE') return 'M';
+      if (value === 'FEMALE') return 'F';
+      return value;
+    }
+    
+    // Map hostel values
+    if (field === 'hostel') {
+      if (value === 'DAY SCHOLAR') return 'DS';
+      return value;
+    }
+    
+    return value;
+  };
+  
+  // Update the handleSubmit function to map display values to backend values
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validate()) return;
     
-    if (mode === 'add') {
-      addStudent(formData as Student);
-    } else if (student) {
-      updateStudent(student.studentId, formData);
+    // Create a copy of the form data
+    const submissionData = { ...formData };
+    
+    // Map display values to backend values
+    if (submissionData.gender) {
+      const genderValue = getDisplayValue('gender', submissionData.gender as string);
+      submissionData.gender = genderValue as unknown as typeof submissionData.gender;
     }
     
-    onClose();
+    if (submissionData.hostel) {
+      submissionData.hostel = getDisplayValue('hostel', submissionData.hostel as string);
+    }
+    
+    // Submit the form
+    if (mode === 'add') {
+      addStudent(submissionData)
+        .then(() => {
+          onClose();
+        })
+        .catch((error) => {
+          console.error('Error adding student:', error);
+          setErrors(prev => ({
+            ...prev,
+            form: 'Failed to add student. Please try again.'
+          }));
+        });
+    } else if (mode === 'edit' && student) {
+      updateStudent(student.studentId, submissionData)
+        .then(() => {
+          onClose();
+        })
+        .catch((error) => {
+          console.error('Error updating student:', error);
+          setErrors(prev => ({
+            ...prev,
+            form: 'Failed to update student. Please try again.'
+          }));
+        });
+    }
   };
   
   // Render form fields based on configuration
@@ -135,16 +186,45 @@ const StudentForm: React.FC<StudentFormProps> = ({
     // Skip fields that mentors can't edit if user is a mentor
     if (!isAdmin && !field.editable) return null;
     
+    // For mentors, only allow editing students they are assigned to
+    if (!isAdmin && student) {
+      // The username is already in the correct format (e.g., "SIJO.JAMES")
+      // The class teacher name in the student record is in display format (e.g., "Sijo James")
+      // We need to convert the class teacher name to username format for comparison
+      
+      const classTeacherAsUsername = student.classTeacher
+        .toUpperCase()
+        .replace(/\s+/g, '.');
+      
+      const isClassTeacher = classTeacherAsUsername === user?.username;
+      
+      if (!isClassTeacher) {
+        return (
+          <Input
+            key={field.id}
+            type={field.type === 'number' ? 'number' : 'text'}
+            name={field.id}
+            label={field.label}
+            value={field.type === 'number' ? (value as number) : (value as string)}
+            onChange={handleChange}
+            error={error}
+            disabled={true}
+            fullWidth
+          />
+        );
+      }
+    }
+    
     switch (field.type) {
-      case 'select':
+      case 'select': {
         let options: string[] = field.options || [];
         
         // Use dynamic options from batch config if available
         if (id === 'batch') options = batchConfig.batches;
         if (id === 'classTeacher') options = batchConfig.teachers;
         if (id === 'hostel') options = batchConfig.hostels;
-        if (id === 'program') options = batchConfig.programs;
         if (id === 'stream') options = batchConfig.streams;
+        if (id === 'program') options = batchConfig.programs;
         
         return (
           <Select
@@ -159,6 +239,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
             fullWidth
           />
         );
+      }
       
       case 'number':
         return (
@@ -191,6 +272,29 @@ const StudentForm: React.FC<StudentFormProps> = ({
         );
     }
   };
+  
+  // Add useEffect to ensure configuration data is loaded
+  useEffect(() => {
+    // Ensure batch config is loaded
+    if (
+      !batchConfig.batches.length ||
+      !batchConfig.teachers.length ||
+      !batchConfig.hostels.length ||
+      !batchConfig.programs.length ||
+      !batchConfig.streams.length
+    ) {
+      // Fetch configurations if not loaded
+      const loadConfigs = async () => {
+        try {
+          await fetchAllConfigs();
+        } catch (error) {
+          console.error('Error loading configurations:', error);
+        }
+      };
+      
+      loadConfigs();
+    }
+  }, [batchConfig, fetchAllConfigs]);
   
   return (
     <form onSubmit={handleSubmit}>

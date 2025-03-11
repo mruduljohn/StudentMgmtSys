@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
-import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
@@ -10,30 +9,66 @@ import { useMentorStore } from '../store/mentorStore';
 import { useStudentStore } from '../store/studentStore';
 import { User } from '../types';
 
+// Define the TableColumn type to match what Table expects
+interface TableColumn {
+  id: string;
+  label: string;
+  width?: string;
+  frozen?: boolean;
+}
+
+// Define a type that extends User to include the id property
+interface MentorWithId extends User {
+  id: string;
+}
+
+// Define a type for the mentor with actions
+interface MentorWithActions extends MentorWithId {
+  actions: React.ReactNode;
+  [key: string]: React.ReactNode | string | undefined; // More specific index signature
+}
+
 const Mentors: React.FC = () => {
-  const { mentors, addMentor, updateMentor, deleteMentor } = useMentorStore();
+  const mentorStore = useMentorStore();
   const { batchConfig } = useStudentStore();
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedMentor, setSelectedMentor] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   
   const [formData, setFormData] = useState<Partial<User>>({
     name: '',
     email: '',
     class: '',
-    role: 'mentor',
+    role: 'MENTOR',
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Initialize mentorStore on component mount
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        // If fetchMentors doesn't exist, we'll just set loading to false
+        // In a real app, you would implement this method in the store
+        setLoading(false);
+      } catch (error) {
+        console.error("Failed to fetch mentors:", error);
+        setLoading(false);
+      }
+    };
+    
+    initializeData();
+  }, []);
   
   const resetForm = () => {
     setFormData({
       name: '',
       email: '',
       class: '',
-      role: 'mentor',
+      role: 'MENTOR',
     });
     setErrors({});
   };
@@ -75,27 +110,27 @@ const Mentors: React.FC = () => {
     if (!validate()) return;
     
     if (isAddModalOpen) {
-      addMentor({
+      mentorStore.addMentor({
         ...formData,
         id: Date.now().toString(),
-        role: 'mentor',
+        role: 'MENTOR',
       } as User);
       setIsAddModalOpen(false);
     } else if (isEditModalOpen && selectedMentor) {
-      updateMentor(selectedMentor.id, formData);
+      mentorStore.updateMentor(selectedMentor.id, formData);
       setIsEditModalOpen(false);
     }
     
     resetForm();
   };
   
-  const handleEdit = (mentor: User) => {
+  const handleEdit = (mentor: MentorWithId) => {
     setSelectedMentor(mentor);
     setFormData({
       name: mentor.name,
       email: mentor.email,
       class: mentor.class,
-      role: 'mentor',
+      role: 'MENTOR',
     });
     setIsEditModalOpen(true);
   };
@@ -107,44 +142,102 @@ const Mentors: React.FC = () => {
   
   const confirmDelete = () => {
     if (selectedMentor) {
-      deleteMentor(selectedMentor.id);
+      mentorStore.deleteMentor(selectedMentor.id);
       setIsDeleteModalOpen(false);
     }
   };
   
-  const columns = [
-    { header: 'Name', accessor: 'name' },
-    { header: 'Email', accessor: 'email' },
-    { header: 'Class', accessor: 'class' },
-    {
-      header: 'Actions',
-      accessor: (mentor: User) => (
-        <div className="flex space-x-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEdit(mentor);
-            }}
-          >
-            <Edit size={16} />
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(mentor);
-            }}
-          >
-            <Trash2 size={16} />
-          </Button>
-        </div>
-      ),
-      width: '120px',
-    },
+  const columns: TableColumn[] = [
+    { id: 'name', label: 'Name', width: '200px' },
+    { id: 'email', label: 'Email', width: '250px' },
+    { id: 'class', label: 'Class', width: '150px' },
+    { id: 'actions', label: 'Actions', width: '120px' }
   ];
+  
+  if (loading) {
+    return (
+      <Layout>
+        <div className="p-4 text-center">
+          <div className="text-lg">Loading mentor data...</div>
+        </div>
+      </Layout>
+    );
+  }
+  
+  // Create a simplified version of the Table component that matches our needs
+  const SimpleTable = ({ data, columns, onRowClick }: { 
+    data: MentorWithActions[]; 
+    columns: TableColumn[]; 
+    onRowClick: (item: MentorWithActions) => void;
+  }) => {
+    return (
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              {columns.map((column) => (
+                <th
+                  key={column.id}
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  style={{ width: column.width }}
+                >
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {data.map((item, index) => (
+              <tr 
+                key={index} 
+                onClick={() => onRowClick(item)}
+                className="hover:bg-gray-50 cursor-pointer"
+              >
+                {columns.map((column) => (
+                  <td 
+                    key={`${index}-${column.id}`} 
+                    className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+                  >
+                    {item[column.id]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+  
+  // Create a custom data structure that includes the actions
+  const mentorsWithActions: MentorWithActions[] = mentorStore.mentors.map(mentor => ({
+    ...mentor,
+    actions: (
+      <div className="flex space-x-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleEdit(mentor as MentorWithId);
+          }}
+        >
+          <Edit size={16} />
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDelete(mentor);
+          }}
+        >
+          <Trash2 size={16} />
+        </Button>
+      </div>
+    )
+  }));
   
   return (
     <Layout>
@@ -165,11 +258,10 @@ const Mentors: React.FC = () => {
       </div>
       
       <div className="bg-white rounded-lg shadow-md p-6">
-        <Table
+        <SimpleTable
           columns={columns}
-          data={mentors}
-          keyExtractor={(mentor) => mentor.id}
-          onRowClick={handleEdit}
+          data={mentorsWithActions}
+          onRowClick={(mentor) => handleEdit(mentor as MentorWithId)}
         />
       </div>
       
@@ -177,7 +269,11 @@ const Mentors: React.FC = () => {
       <Modal
         isOpen={isAddModalOpen || isEditModalOpen}
         onClose={() => {
-          isAddModalOpen ? setIsAddModalOpen(false) : setIsEditModalOpen(false);
+          if (isAddModalOpen) {
+            setIsAddModalOpen(false);
+          } else {
+            setIsEditModalOpen(false);
+          }
           resetForm();
         }}
         title={isAddModalOpen ? 'Add New Mentor' : 'Edit Mentor'}
@@ -216,7 +312,11 @@ const Mentors: React.FC = () => {
             <Button
               variant="secondary"
               onClick={() => {
-                isAddModalOpen ? setIsAddModalOpen(false) : setIsEditModalOpen(false);
+                if (isAddModalOpen) {
+                  setIsAddModalOpen(false);
+                } else {
+                  setIsEditModalOpen(false);
+                }
                 resetForm();
               }}
             >
