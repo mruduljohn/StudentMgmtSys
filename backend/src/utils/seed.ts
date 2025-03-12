@@ -47,23 +47,36 @@ async function seedDefaultConfigs(adminId: mongoose.Types.ObjectId) {
     const defaultConfigs = [
       {
         category: "batches",
-        values: ["25TSRFIX", "26TSRFIX", "27TSRFIX"]
+        values: ['25HTSE', '25HTSM', '25STE1(Bh)', '25STE2(Nm)', '25STM1(Bh)', '25STM2(Nm)', 
+    '25TRE1(State)', '25TRE2(CBSE)', '25TRM1', '25TSRFIX', '25TSRFVI', '25TSRFVII', 
+    '25TSRFVIII', '25TSRFX', '26BTE1(Bh)', '26BTM1(Bh)', '26ETSA1', '26ETSI1', 
+    '26HTSA1', '26HTSI1', '26TRE11', '26TRM11', '26TSRA3', '26TSRA4', '26TSRI3', 
+    '26TSRI4', 'K1', 'K10', 'K11', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7', 'K8RR', 
+    'K9RR', 'KE1', 'KE2', 'KE3', 'NEW R', 'NEW RR', 'ONLINE']
       },
       {
         category: "classTeachers",
-        values: ["DEEPA.MD.(WB)", "JOHN.D", "MARY.S"]
+        values: ['DEEPA.MD.(WB)', 'ARCHANA', 'JEEVAN.JOSHY', 'KEERTHY.E.(WB)', 'NIMYA.GIRIJAN.(WB)', 
+    'SRUTHI.(WB)', 'SANDRA.(WB)', 'ATHIRA.(WB)', 'ARYA.R', 'LIMSY.PAULSON.(WB)', 
+    'STENIYA.LIEONS.(WB)', 'SHINI.T.S.(WB)', 'CHAITRA', 'ANJU.K', 'MEGHA.MUKUNDAN', 
+    'NOT ASSIGNED', 'ALBIN.VARGHESE', 'RAJESWARY.VISWANATHAN', 'SWATHY', 'SRUTHI.P', 
+    'JOYAL.P.JOSE', 'HARIKRISHNAN.R', 'ARPITHA.SHAJAN', 'SANJANA', 'NELSON', 
+    'VISWAM.MURALI', 'MANJIMA.JIMMY', 'ANOOP.MOHAN', 'VISAKHAN', 'ANJALI.K.DAS.(WB)', 
+    'ANANDALAKSHMI', 'JISHNA', 'DONA.MERIN.JOSE', 'RADHIKA.ANILKUMAR', 'SREELAKSHMI.P']
       },
       {
         category: "hostels",
-        values: ["DS", "BOYS HOSTEL", "GIRLS HOSTEL"]
+        values: ['DAY SCHOLAR', 'ST.ANNS', 'MARIGOLD GRAND', 'HOSTEL REQUIRED', 'ST.JOHNS', 
+    'THE GUARDIAN', 'NEST GRAND', 'LAVERNA', 'B MADONA', 'B MARTHOMA', 'B ST.MARYS', 
+    'PETER CLAVER', 'LITTLE FLOWER', 'ST.AUGUSTINE', 'SDV']
       },
       {
         category: "streams",
-        values: ["FOUNDATION", "MEDICAL", "ENGINEERING"]
+        values: ['FOUNDATION', 'ENGINEERING', 'MEDICAL']
       },
       {
         category: "programs",
-        values: ["FOUNDATION", "NEET", "JEE"]
+        values: ['FOUNDATION', 'EVENING', 'SPECIAL', 'SUPER', 'HYBRID', 'REPEATER', 'REGULAR']
       },
       {
         category: "studyMaterials",
