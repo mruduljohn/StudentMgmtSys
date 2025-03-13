@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, UserPlus, Edit } from 'lucide-react';
+import { Trash2, UserPlus, Edit, Key } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -9,6 +9,9 @@ import { useAuthStore } from '../store/authStore';
 import { User } from '../types';
 import Select from '../components/ui/Select';
 import { useStudentStore } from '../store/studentStore';
+import PasswordResetForm from '../components/users/PasswordResetForm';
+import MobileTable from '../components/ui/MobileTable';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 interface ApiError {
   response?: {
@@ -27,9 +30,11 @@ const UserManagement: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -152,6 +157,11 @@ const UserManagement: React.FC = () => {
     setIsEditModalOpen(true);
   };
 
+  const handleResetPassword = (user: User) => {
+    setSelectedUser(user);
+    setIsResetPasswordModalOpen(true);
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -197,6 +207,22 @@ const UserManagement: React.FC = () => {
         
         {users.length === 0 ? (
           <p className="text-gray-500">No users found.</p>
+        ) : isMobile ? (
+          <MobileTable
+            columns={[
+              { id: 'username', label: 'Username' },
+              { id: 'name', label: 'Name' },
+              { id: 'email', label: 'Email' },
+              { id: 'role', label: 'Role' },
+              { id: 'class', label: 'Assigned Class' }
+            ]}
+            data={users.map(user => ({
+              ...user,
+              role: user.role === 'ADMIN' ? 'Admin' : 'Mentor',
+              class: user.class || '-'
+            }))}
+            priorityFields={['name', 'username', 'role']}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -250,8 +276,20 @@ const UserManagement: React.FC = () => {
                           variant="secondary"
                           size="sm"
                           onClick={() => handleEdit(user)}
+                          className="flex items-center"
                         >
-                          <Edit size={16} />
+                          <Edit size={14} className="mr-1" />
+                          Edit
+                        </Button>
+                        
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleResetPassword(user)}
+                          className="flex items-center"
+                        >
+                          <Key size={14} className="mr-1" />
+                          Reset Password
                         </Button>
                         
                         {/* Don't allow deleting yourself */}
@@ -260,12 +298,13 @@ const UserManagement: React.FC = () => {
                             variant="danger"
                             size="sm"
                             onClick={() => {
-                              console.log('Selected user for deletion:', user);
                               setSelectedUser(user);
                               setIsDeleteModalOpen(true);
                             }}
+                            className="flex items-center"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} className="mr-1" />
+                            Delete
                           </Button>
                         )}
                       </div>
@@ -284,10 +323,10 @@ const UserManagement: React.FC = () => {
         onClose={() => setIsAddModalOpen(false)}
         title="Add New User"
       >
-        <form onSubmit={handleAddUser}>
+        <form onSubmit={handleAddUser} className="space-y-4">
           <Input
-            name="username"
             label="Username"
+            name="username"
             value={formData.username}
             onChange={handleInputChange}
             required
@@ -295,8 +334,8 @@ const UserManagement: React.FC = () => {
           />
           
           <Input
+            label="Name"
             name="name"
-            label="Full Name"
             value={formData.name}
             onChange={handleInputChange}
             required
@@ -304,9 +343,9 @@ const UserManagement: React.FC = () => {
           />
           
           <Input
-            name="email"
-            label="Email"
             type="email"
+            label="Email"
+            name="email"
             value={formData.email}
             onChange={handleInputChange}
             required
@@ -314,9 +353,9 @@ const UserManagement: React.FC = () => {
           />
           
           <Input
-            name="password"
-            label="Password"
             type="password"
+            label="Password"
+            name="password"
             value={formData.password}
             onChange={handleInputChange}
             required
@@ -324,33 +363,42 @@ const UserManagement: React.FC = () => {
           />
           
           <Select
-            name="role"
             label="Role"
+            name="role"
             value={formData.role}
             onChange={handleInputChange}
-            options={['ADMIN', 'MENTOR']}
+            options={[
+              { value: 'ADMIN', label: 'Administrator' },
+              { value: 'MENTOR', label: 'Mentor' }
+            ]}
             fullWidth
           />
           
           {formData.role === 'MENTOR' && (
             <Select
-              name="class"
               label="Assigned Class"
+              name="class"
               value={formData.class}
               onChange={handleInputChange}
-              options={batchConfig.batches}
+              options={batchConfig.teachers.map(teacher => ({
+                value: teacher,
+                label: teacher
+              }))}
               fullWidth
             />
           )}
           
-          <div className="mt-6 flex justify-end space-x-3">
+          <div className="flex justify-end space-x-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => setIsAddModalOpen(false)}
             >
               Cancel
             </Button>
-            <Button variant="primary" type="submit">
+            <Button
+              variant="primary"
+              type="submit"
+            >
               Add User
             </Button>
           </div>
@@ -363,19 +411,10 @@ const UserManagement: React.FC = () => {
         onClose={() => setIsEditModalOpen(false)}
         title="Edit User"
       >
-        <form onSubmit={handleEditUser}>
+        <form onSubmit={handleEditUser} className="space-y-4">
           <Input
-            name="username"
-            label="Username"
-            value={formData.username}
-            onChange={handleInputChange}
-            disabled
-            fullWidth
-          />
-          
-          <Input
+            label="Name"
             name="name"
-            label="Full Name"
             value={formData.name}
             onChange={handleInputChange}
             required
@@ -383,9 +422,9 @@ const UserManagement: React.FC = () => {
           />
           
           <Input
-            name="email"
-            label="Email"
             type="email"
+            label="Email"
+            name="email"
             value={formData.email}
             onChange={handleInputChange}
             required
@@ -393,66 +432,90 @@ const UserManagement: React.FC = () => {
           />
           
           <Select
-            name="role"
             label="Role"
+            name="role"
             value={formData.role}
             onChange={handleInputChange}
-            options={['ADMIN', 'MENTOR']}
+            options={[
+              { value: 'ADMIN', label: 'Administrator' },
+              { value: 'MENTOR', label: 'Mentor' }
+            ]}
             fullWidth
           />
           
           {formData.role === 'MENTOR' && (
             <Select
-              name="class"
               label="Assigned Class"
+              name="class"
               value={formData.class}
               onChange={handleInputChange}
-              options={batchConfig.batches}
+              options={batchConfig.teachers.map(teacher => ({
+                value: teacher,
+                label: teacher
+              }))}
               fullWidth
             />
           )}
           
-          <div className="mt-6 flex justify-end space-x-3">
+          <div className="flex justify-end space-x-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => setIsEditModalOpen(false)}
             >
               Cancel
             </Button>
-            <Button variant="primary" type="submit">
+            <Button
+              variant="primary"
+              type="submit"
+            >
               Update User
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete User Confirmation Modal */}
       <Modal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        title="Confirm Delete"
-        size="sm"
+        title="Delete User"
       >
-        <div className="text-center">
+        <div className="p-4">
           <p className="mb-4">
-            Are you sure you want to delete user{' '}
-            <span className="font-semibold">{selectedUser?.name}</span>?
-          </p>
-          <p className="mb-6 text-red-600 text-sm">
+            Are you sure you want to delete the user <strong>{selectedUser?.name}</strong>?
             This action cannot be undone.
           </p>
-          <div className="flex justify-center space-x-4">
+          
+          <div className="flex justify-end space-x-3">
             <Button
               variant="secondary"
               onClick={() => setIsDeleteModalOpen(false)}
             >
               Cancel
             </Button>
-            <Button variant="danger" onClick={handleDeleteUser}>
-              Delete
+            <Button
+              variant="danger"
+              onClick={handleDeleteUser}
+            >
+              Delete User
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal
+        isOpen={isResetPasswordModalOpen}
+        onClose={() => setIsResetPasswordModalOpen(false)}
+        title="Reset Password"
+      >
+        {selectedUser && (
+          <PasswordResetForm
+            user={selectedUser}
+            onClose={() => setIsResetPasswordModalOpen(false)}
+            isSelf={selectedUser.id === currentUser?.id}
+          />
+        )}
       </Modal>
     </Layout>
   );

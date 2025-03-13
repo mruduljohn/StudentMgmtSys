@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Download, FileSpreadsheet, AlertCircle, FileDown } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, AlertCircle, FileDown, UserPlus, RefreshCw } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/ui/Button';
 import { useStudentStore } from '../store/studentStore';
@@ -9,12 +9,15 @@ import * as XLSX from 'xlsx';
 const ImportExport: React.FC = () => {
   const studentStore = useStudentStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const newStudentsFileInputRef = useRef<HTMLInputElement>(null);
+  const updateStudentsFileInputRef = useRef<HTMLInputElement>(null);
   
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [importMode, setImportMode] = useState<'combined' | 'new' | 'update'>('combined');
   
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, mode: 'combined' | 'new' | 'update') => {
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -23,19 +26,40 @@ const ImportExport: React.FC = () => {
     setUploadSuccess(null);
     
     try {
-      // Use the uploadCSV method from studentStore
-      const result = await studentStore.uploadCSV(file);
+      let result;
+      
+      if (mode === 'new') {
+        // Use the uploadNewStudentsCSV method for adding new students only
+        result = await studentStore.uploadNewStudentsCSV(file);
+      } else if (mode === 'update') {
+        // Use the uploadUpdateStudentsCSV method for updating existing students
+        result = await studentStore.uploadUpdateStudentsCSV(file);
+      } else {
+        // Use the original uploadCSV method for combined functionality
+        result = await studentStore.uploadCSV(file);
+      }
       
       if (result && result.results) {
         // Check if the result includes details about created vs updated students
-        if (result.details && (result.details.created || result.details.updated)) {
-          setUploadSuccess(
-            `Successfully processed ${result.results.successful} students ` +
-            `(${result.details.created || 0} created, ${result.details.updated || 0} updated, ` +
-            `${result.results.failed} failed)`
-          );
+        if (result.details) {
+          let successMessage = `Successfully processed ${result.results.successful} students `;
+          
+          if (mode === 'new') {
+            successMessage += `(${result.details.created || 0} created, ${result.results.failed} failed)`;
+          } else if (mode === 'update') {
+            successMessage += `(${result.details.updated || 0} updated, ${result.results.failed} failed)`;
+          } else {
+            successMessage += `(${result.details.created || 0} created, ${result.details.updated || 0} updated, ${result.results.failed} failed)`;
+          }
+          
+          setUploadSuccess(successMessage);
         } else {
           setUploadSuccess(`Successfully processed ${result.results.successful} students (${result.results.failed} failed)`);
+        }
+        
+        // If there's an error log, provide a message about it
+        if (result.errorLog) {
+          setUploadSuccess(prev => `${prev}. Error details have been logged on the server.`);
         }
       } else {
         setUploadError('Failed to upload file');
@@ -46,7 +70,11 @@ const ImportExport: React.FC = () => {
     } finally {
       setIsUploading(false);
       // Reset file input
-      if (fileInputRef.current) {
+      if (mode === 'new' && newStudentsFileInputRef.current) {
+        newStudentsFileInputRef.current.value = '';
+      } else if (mode === 'update' && updateStudentsFileInputRef.current) {
+        updateStudentsFileInputRef.current.value = '';
+      } else if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
@@ -171,13 +199,75 @@ const ImportExport: React.FC = () => {
             <h2 className="text-lg font-semibold">Import Students</h2>
           </div>
           
-          <p className="text-gray-600 mb-4">
-            Upload an Excel file with student data. The file should have columns matching the student fields.
-            <br /><br />
-            <strong>Note:</strong> If the Excel file contains students with IDs that already exist in the system, 
-            their information will be updated with the new values from the file. Only the fields included in the 
-            Excel file will be updated; other fields will remain unchanged.
-          </p>
+          <div className="mb-6">
+            <div className="flex flex-col gap-2 mb-4">
+              <div className="flex items-center">
+                <input 
+                  type="radio" 
+                  id="combined-import" 
+                  name="import-mode" 
+                  value="combined" 
+                  checked={importMode === 'combined'} 
+                  onChange={() => setImportMode('combined')}
+                  className="mr-2"
+                />
+                <label htmlFor="combined-import" className="text-gray-700 font-medium">
+                  Combined Import (Add new & update existing)
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input 
+                  type="radio" 
+                  id="new-import" 
+                  name="import-mode" 
+                  value="new" 
+                  checked={importMode === 'new'} 
+                  onChange={() => setImportMode('new')}
+                  className="mr-2"
+                />
+                <label htmlFor="new-import" className="text-gray-700 font-medium">
+                  Add New Students Only
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input 
+                  type="radio" 
+                  id="update-import" 
+                  name="import-mode" 
+                  value="update" 
+                  checked={importMode === 'update'} 
+                  onChange={() => setImportMode('update')}
+                  className="mr-2"
+                />
+                <label htmlFor="update-import" className="text-gray-700 font-medium">
+                  Update Existing Students Only
+                </label>
+              </div>
+            </div>
+            
+            {importMode === 'combined' && (
+              <p className="text-gray-600 mb-4">
+                Upload an Excel file with student data. If the Excel file contains students with IDs that already exist in the system, 
+                their information will be updated. New student IDs will be added as new records.
+              </p>
+            )}
+            
+            {importMode === 'new' && (
+              <p className="text-gray-600 mb-4">
+                Upload an Excel file with <strong>new students only</strong>. All student IDs must be unique and not already exist in the system.
+                Any records with duplicate student IDs will be rejected and logged.
+              </p>
+            )}
+            
+            {importMode === 'update' && (
+              <p className="text-gray-600 mb-4">
+                Upload an Excel file to <strong>update existing students only</strong>. All student IDs must already exist in the system.
+                Any records with non-existent student IDs will be rejected and logged.
+              </p>
+            )}
+          </div>
           
           {uploadError && (
             <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md flex items-start">
@@ -193,26 +283,81 @@ const ImportExport: React.FC = () => {
           )}
           
           <div className="mt-4">
+            {/* Combined import file input */}
             <input
               type="file"
               ref={fileInputRef}
               accept=".xlsx,.xls,.csv"
-              onChange={handleFileChange}
+              onChange={(e) => handleFileChange(e, 'combined')}
               className="hidden"
               id="file-upload"
+              disabled={importMode !== 'combined'}
             />
+            
+            {/* New students file input */}
+            <input
+              type="file"
+              ref={newStudentsFileInputRef}
+              accept=".xlsx,.xls,.csv"
+              onChange={(e) => handleFileChange(e, 'new')}
+              className="hidden"
+              id="new-students-upload"
+              disabled={importMode !== 'new'}
+            />
+            
+            {/* Update students file input */}
+            <input
+              type="file"
+              ref={updateStudentsFileInputRef}
+              accept=".xlsx,.xls,.csv"
+              onChange={(e) => handleFileChange(e, 'update')}
+              className="hidden"
+              id="update-students-upload"
+              disabled={importMode !== 'update'}
+            />
+            
             <div className="flex flex-col sm:flex-row gap-3">
-              <label htmlFor="file-upload">
-                <Button
-                  variant="primary"
-                  className="flex items-center"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                >
-                  <FileSpreadsheet size={16} className="mr-2" />
-                  {isUploading ? 'Uploading...' : 'Select Excel File'}
-                </Button>
-              </label>
+              {importMode === 'combined' && (
+                <label htmlFor="file-upload">
+                  <Button
+                    variant="primary"
+                    className="flex items-center"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    <FileSpreadsheet size={16} className="mr-2" />
+                    {isUploading ? 'Uploading...' : 'Select Excel File'}
+                  </Button>
+                </label>
+              )}
+              
+              {importMode === 'new' && (
+                <label htmlFor="new-students-upload">
+                  <Button
+                    variant="primary"
+                    className="flex items-center"
+                    onClick={() => newStudentsFileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    <UserPlus size={16} className="mr-2" />
+                    {isUploading ? 'Uploading...' : 'Select New Students File'}
+                  </Button>
+                </label>
+              )}
+              
+              {importMode === 'update' && (
+                <label htmlFor="update-students-upload">
+                  <Button
+                    variant="primary"
+                    className="flex items-center"
+                    onClick={() => updateStudentsFileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    <RefreshCw size={16} className="mr-2" />
+                    {isUploading ? 'Uploading...' : 'Select Update File'}
+                  </Button>
+                </label>
+              )}
               
               <Button
                 variant="secondary"

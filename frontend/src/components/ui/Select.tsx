@@ -1,8 +1,10 @@
 import React from 'react';
 
+type SelectOption = string | { value: string; label: string };
+
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
-  options: string[];
+  options: SelectOption[];
   error?: string;
   fullWidth?: boolean;
 }
@@ -32,11 +34,21 @@ const Select: React.FC<SelectProps> = ({
       )}
       <select className={selectClasses} {...props}>
         <option value="">Select...</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
+        {options.map((option) => {
+          if (typeof option === 'string') {
+            return (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            );
+          } else {
+            return (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            );
+          }
+        })}
       </select>
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>

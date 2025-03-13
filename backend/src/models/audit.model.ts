@@ -10,7 +10,7 @@ const auditSchema = new mongoose.Schema(
     action: {
       type: String,
       required: true,
-      enum: ["CREATE", "UPDATE", "DELETE", "UPLOAD", "LOGIN", "LOGOUT", "CONFIG_CHANGE"]
+      enum: ["CREATE", "UPDATE", "DELETE", "UPLOAD", "LOGIN", "LOGOUT", "CONFIG_CHANGE", "RESET_PASSWORD"]
     },
     entityType: {
       type: String,

@@ -75,6 +75,14 @@ export const getCurrentUser = async () => {
   return response.data;
 };
 
+export const resetPassword = async (userId: string, passwordData: {
+  currentPassword?: string;
+  newPassword: string;
+}) => {
+  const response = await api.post(`/auth/reset-password/${userId}`, passwordData);
+  return response.data;
+};
+
 // Student APIs
 export const fetchStudents = async (params?: { 
   page?: number; 
@@ -135,7 +143,33 @@ export const uploadStudentCSV = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await api.post('/students/upload/csv', formData, {
+  const response = await api.post('/students/upload-csv', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  
+  return response.data;
+};
+
+export const uploadNewStudentsCSV = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await api.post('/students/upload-new-csv', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  
+  return response.data;
+};
+
+export const uploadUpdateStudentsCSV = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await api.post('/students/upload-update-csv', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },

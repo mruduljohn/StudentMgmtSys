@@ -7,6 +7,8 @@ import {
   updateStudent as apiUpdateStudent, 
   deleteStudent as apiDeleteStudent,
   uploadStudentCSV,
+  uploadNewStudentsCSV,
+  uploadUpdateStudentsCSV,
   getStudentStats,
   getAllConfigs,
   updateConfig
@@ -454,6 +456,54 @@ class StudentStore {
         this.loading.set(false);
       });
       console.error('Error uploading CSV:', error);
+      throw error;
+    }
+  });
+
+  uploadNewStudentsCSV = action(async (file: File) => {
+    this.loading.set(true);
+    this.error.set(null);
+
+    try {
+      const response = await uploadNewStudentsCSV(file);
+      
+      runInAction(() => {
+        this.loading.set(false);
+        // Refresh all students after upload
+        this.fetchAllStudents();
+      });
+      
+      return response;
+    } catch (error) {
+      runInAction(() => {
+        this.error.set('Failed to upload new students CSV');
+        this.loading.set(false);
+      });
+      console.error('Error uploading new students CSV:', error);
+      throw error;
+    }
+  });
+
+  uploadUpdateStudentsCSV = action(async (file: File) => {
+    this.loading.set(true);
+    this.error.set(null);
+
+    try {
+      const response = await uploadUpdateStudentsCSV(file);
+      
+      runInAction(() => {
+        this.loading.set(false);
+        // Refresh all students after upload
+        this.fetchAllStudents();
+      });
+      
+      return response;
+    } catch (error) {
+      runInAction(() => {
+        this.error.set('Failed to upload update students CSV');
+        this.loading.set(false);
+      });
+      console.error('Error uploading update students CSV:', error);
       throw error;
     }
   });

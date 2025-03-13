@@ -6,7 +6,8 @@ import {
   logoutUser,
   getAllUsers,
   updateUser,
-  deleteUser
+  deleteUser,
+  resetPassword
 } from "../controllers/auth.controller";
 import { authMiddleware, adminOnly } from "../middlewares/auth.middleware";
 
@@ -184,5 +185,46 @@ router.put("/users/:id", authMiddleware, adminOnly, updateUser);
  *         description: User not found
  */
 router.delete("/users/:id", authMiddleware, adminOnly, deleteUser);
+
+/**
+ * @swagger
+ * /auth/reset-password/{id}:
+ *   post:
+ *     summary: Reset user password (Admin can reset any user, users can reset their own)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *                 description: Required when user is resetting their own password
+ *               newPassword:
+ *                 type: string
+ *                 required: true
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Current password is required
+ *       401:
+ *         description: Current password is incorrect
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: User not found
+ */
+router.post("/reset-password/:id", authMiddleware, resetPassword);
 
 export default router;

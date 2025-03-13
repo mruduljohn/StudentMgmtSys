@@ -21,8 +21,8 @@ const Navbar: React.FC = () => {
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0 flex items-center">
               <User className="h-8 w-8 mr-2" />
-              <span className="font-bold text-xl hidden md:block">Student Management System</span>
-              <span className="font-bold text-xl md:hidden">SMS</span>
+              <span className="font-bold text-xl hidden md:block">Brilliant Student Management System</span>
+              <span className="font-bold text-xl md:hidden">Brilliant SMS</span>
             </Link>
           </div>
           

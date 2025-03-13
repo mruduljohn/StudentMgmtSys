@@ -298,3 +298,63 @@ export const logoutUser = async (req: Request, res: Response): Promise<void> => 
     res.status(500).json({ message: "Server error" });
   }
 };
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.params.id;
+    const { currentPassword, newPassword } = req.body;
+    
+    // Find user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+    
+    // If resetting own password, verify current password
+    if (req.user?.id === userId) {
+      if (!currentPassword) {
+        res.status(400).json({ message: "Current password is required" });
+        return;
+      }
+      
+      const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isPasswordValid) {
+        res.status(401).json({ message: "Current password is incorrect" });
+        return;
+      }
+    } else {
+      // Only ADMIN can reset other users' passwords
+      if (req.user?.role !== "ADMIN") {
+        res.status(403).json({ message: "Only administrators can reset other users' passwords" });
+        return;
+      }
+    }
+    
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    
+    // Update user's password
+    user.password = hashedPassword;
+    await user.save();
+    
+    // Log password reset
+    await Audit.create({
+      user: req.user?.id,
+      action: "RESET_PASSWORD",
+      entityType: "USER",
+      entityId: user._id,
+      details: { 
+        username: user.username,
+        resetByAdmin: req.user?.id !== userId
+      },
+      ipAddress: req.ip
+    });
+    
+    res.json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};

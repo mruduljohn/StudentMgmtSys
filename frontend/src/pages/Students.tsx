@@ -3,6 +3,7 @@ import { observer } from 'mobx-react-lite';
 import { Plus, Edit, Trash2, Filter, FileDown } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Table, { TableItem } from '../components/ui/Table';
+import MobileTable from '../components/ui/MobileTable';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Pagination from '../components/ui/Pagination';
@@ -15,6 +16,7 @@ import { useAuthStore } from '../store/authStore';
 import { Student } from '../types';
 import { studentsToExcel, downloadExcel } from '../utils/excelUtils';
 import PasswordConfirmModal from '../components/ui/PasswordConfirmModal';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 // Define types for bulk actions and sort options
 // interface BulkAction {
@@ -74,11 +76,11 @@ const Students: React.FC = observer(() => {
   const studentStore = useStudentStore();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
+  const isMobile = useMediaQuery('(max-width: 768px)');
   
   // Get batch config from the store
   const { batchConfig } = studentStore;
   
-  const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -89,6 +91,7 @@ const Students: React.FC = observer(() => {
   const [storeInitialized, setStoreInitialized] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [deleteAction, setDeleteAction] = useState<'single' | 'bulk'>('single');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Initialize store on component mount
   useEffect(() => {
@@ -162,12 +165,40 @@ const Students: React.FC = observer(() => {
       }
     }
     
-    setSelectedStudent(student);
+    // Make sure we're using the original student object with a string name property
+    // Get the original student from the store
+    const originalStudent = studentStore.getStudents.find(s => s.studentId === student.studentId);
+    
+    if (originalStudent) {
+      setSelectedStudent(originalStudent as ExtendedStudent);
+    } else {
+      // Fallback to the provided student but ensure name is a string
+      const studentWithStringName = {
+        ...student,
+        name: typeof student.name === 'string' ? student.name : 'Student'
+      };
+      setSelectedStudent(studentWithStringName);
+    }
+    
     setIsEditModalOpen(true);
   };
   
   const handleDelete = (student: ExtendedStudent) => {
-    setSelectedStudent(student);
+    // Make sure we're using the original student object with a string name property
+    // Get the original student from the store
+    const originalStudent = studentStore.getStudents.find(s => s.studentId === student.studentId);
+    
+    if (originalStudent) {
+      setSelectedStudent(originalStudent as ExtendedStudent);
+    } else {
+      // Fallback to the provided student but ensure name is a string
+      const studentWithStringName = {
+        ...student,
+        name: typeof student.name === 'string' ? student.name : 'Student'
+      };
+      setSelectedStudent(studentWithStringName);
+    }
+    
     // Open password confirmation modal instead of delete modal directly
     setDeleteAction('single');
     setIsPasswordModalOpen(true);
@@ -247,7 +278,6 @@ const Students: React.FC = observer(() => {
   
   const handleSearch = (query: string, fields: Record<string, string>) => {
     console.log("Search triggered with query:", query, "and fields:", fields);
-    setSearchTerm(query);
     
     // Set the search query
     studentStore.setSearchQuery(query);
@@ -684,110 +714,113 @@ const Students: React.FC = observer(() => {
   
   return (
     <Layout>
-      {/* Hidden elements to use variables and prevent linter errors */}
-      {renderSortOptions()}
-      {renderBulkActions()}
-      
-      <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">Students</h1>
+      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Students</h1>
+          <p className="text-gray-600">
+            {studentStore.getTotalStudents} students found
+          </p>
+        </div>
         
         <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              onClick={handleExportFiltered}
-              className="flex items-center"
-              title="Export all students with current filters"
-            >
-              <FileDown size={16} className="mr-1" /> Export All
-            </Button>
-            
-            {isAdmin && (
+          {isAdmin && (
             <Button
               variant="primary"
-              onClick={() => setIsAddModalOpen(true)}
               className="flex items-center"
+              onClick={() => setIsAddModalOpen(true)}
             >
               <Plus size={16} className="mr-1" />
               Add Student
             </Button>
           )}
           
-            <Button
-              variant="secondary"
-              onClick={() => setIsFilterModalOpen(true)}
-              className="flex items-center"
-            >
-              <Filter size={16} className="mr-1" /> Filter
-            </Button>
-            
-            {isAdmin && selectedRows.length > 0 && (
-              <div className="flex space-x-2">
-                <Button
-                  variant="danger"
-                  onClick={handleBulkDelete}
-                  className="flex items-center"
-                >
-                  <Trash2 size={16} className="mr-1" /> Delete Selected
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleBulkEdit}
-                  className="flex items-center"
-                >
-                  <Edit size={16} className="mr-1" /> Edit Selected
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleExportSelected}
-                  className="flex items-center"
-                >
-                  <FileDown size={16} className="mr-1" /> Export Selected
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Search and bulk actions */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="w-1/3">
-            <AdvancedSearch
-              onSearch={handleSearch}
-              searchFields={searchFields}
-              initialQuery={searchTerm}
-            />
-          </div>
-        </div>
-        
-        {/* Students table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-        <Table
-          columns={columns}
-          data={studentsWithPaymentStatus}
-            isSelectable={isAdmin}
-            emptyMessage="No students found"
-            sortField={studentStore.getSortField}
-            sortOrder={studentStore.getSortOrder}
-            onSort={handleSort}
-          />
-        </div>
-
-        {/* Pagination */}
-        <div className="mt-4 flex justify-between items-center">
-          <div>
-            Showing {studentStore.getStudents.length} of {studentStore.getTotalStudents} students
-          </div>
-          <Pagination
-            currentPage={studentStore.getCurrentPage}
-            totalPages={studentStore.getTotalPages}
-            onPageChange={(page) => studentStore.setPage(page)}
-            pageSize={studentStore.getPageSize}
-            totalItems={studentStore.getTotalStudents}
-            onPageSizeChange={(size) => studentStore.setPageSize(size)}
-          />
+          <Button
+            variant="secondary"
+            className="flex items-center"
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+          >
+            <Filter size={16} className="mr-1" />
+            Filter
+          </Button>
+          
+          {renderSortOptions()}
+          
+          {selectedRows.length > 0 && renderBulkActions()}
         </div>
       </div>
+      
+      {isFilterOpen && (
+        <div className="mb-6">
+          <FilterPanel
+            filters={filterOptions}
+            onApplyFilters={handleApplyFilters}
+            onResetFilters={() => {
+              studentStore.clearFilters();
+              studentStore.fetchStudents();
+            }}
+            isOpen={isFilterOpen}
+            onClose={() => setIsFilterOpen(false)}
+            initialValues={{}}
+          />
+        </div>
+      )}
+      
+      <div className="mb-6">
+        <AdvancedSearch
+          searchFields={searchFields}
+          onSearch={handleSearch}
+          initialQuery=""
+        />
+      </div>
+      
+      {studentStore.isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <p className="text-gray-500">Loading students...</p>
+        </div>
+      ) : (
+        <>
+          {isMobile ? (
+            <MobileTable
+              columns={columns}
+              data={studentsWithPaymentStatus}
+              onRowClick={(student) => handleEdit(student as ExtendedStudent)}
+              priorityFields={['name', 'studentId', 'batch', 'classTeacher']}
+            />
+          ) : (
+            <Table
+              columns={columns}
+              data={studentsWithPaymentStatus}
+              onRowClick={(student) => handleEdit(student as ExtendedStudent)}
+              isSelectable={isAdmin}
+              sortField={studentStore.getSortField}
+              sortOrder={studentStore.getSortOrder}
+              onSort={handleSort}
+            />
+          )}
+          
+          <div className="mt-4 flex justify-between items-center">
+            <div className="text-sm text-gray-500">
+              Showing {studentsWithPaymentStatus.length} of {studentStore.getTotalStudents} students
+            </div>
+            
+            <Pagination
+              currentPage={studentStore.getCurrentPage}
+              totalPages={studentStore.getTotalPages}
+              onPageChange={(page) => {
+                studentStore.setPage(page);
+                studentStore.fetchStudents();
+              }}
+              pageSize={studentStore.getPageSize}
+              totalItems={studentStore.getTotalStudents}
+              onPageSizeChange={(size) => {
+                studentStore.setPageSize(size);
+                studentStore.fetchStudents();
+              }}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
+          </div>
+        </>
+      )}
       
       {/* Add Student Modal */}
       <Modal
@@ -809,7 +842,7 @@ const Students: React.FC = observer(() => {
       <Modal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
-        title="Edit Student"
+        title={`Edit Student: ${typeof selectedStudent?.name === 'string' ? selectedStudent?.name : 'Student'}`}
         size="lg"
       >
         {selectedStudent && (

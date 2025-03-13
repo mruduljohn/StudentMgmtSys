@@ -7,7 +7,9 @@ import {
   updateStudent,
   deleteStudent,
   uploadCSV,
-  getStudentStats
+  getStudentStats,
+  uploadNewStudentsCSV,
+  uploadUpdateStudentsCSV
 } from "../controllers/student.controller";
 import { authMiddleware, adminOnly, mentorOrAdmin } from "../middlewares/auth.middleware";
 
@@ -211,5 +213,9 @@ router.post(
  *         description: Student statistics
  */
 router.get("/students/stats", authMiddleware, getStudentStats);
+
+router.post('/upload-csv', authMiddleware, adminOnly, upload.single('file'), uploadCSV);
+router.post('/upload-new-csv', authMiddleware, adminOnly, upload.single('file'), uploadNewStudentsCSV);
+router.post('/upload-update-csv', authMiddleware, adminOnly, upload.single('file'), uploadUpdateStudentsCSV);
 
 export default router;

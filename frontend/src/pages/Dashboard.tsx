@@ -48,7 +48,7 @@ const Dashboard: React.FC = observer(() => {
     };
     
     initializeData();
-  }, [studentStore]);
+  }, [studentStore, user]);
   
   const isAdmin = user?.role === 'ADMIN';
   
