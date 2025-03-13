@@ -80,6 +80,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     
     try {
       const user = await getCurrentUser();
+      // Store user in localStorage for persistence
+      localStorage.setItem('user', JSON.stringify(user));
+      
       set({ 
         user, 
         isAuthenticated: true, 
@@ -89,6 +92,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // Clear token if invalid
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
       set({ 
         user: null, 
         isAuthenticated: false, 

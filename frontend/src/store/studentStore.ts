@@ -35,10 +35,6 @@ interface ApiParams {
   [key: string]: string | number | boolean | undefined;
 }
 
-// Add a static flag outside the class to prevent repeated API calls
-let isDataFetchInProgress = false;
-let hasDataBeenFetched = false;
-
 class StudentStore {
   students = observable.array<Student>([]);
   allStudents = observable.array<Student>([]); // Store all students
@@ -92,12 +88,9 @@ class StudentStore {
 
   // Initialize the store with data
   init = action(async () => {
-    // Check if data has already been fetched
-    if (this.dataLoaded.get()) {
-      console.log("Using cached data - data already fetched");
-      return;
-    }
-
+    // Always reset the dataLoaded flag to ensure fresh data is fetched
+    this.dataLoaded.set(false);
+    
     this.loading.set(true);
     this.error.set(null);
 
@@ -242,20 +235,7 @@ class StudentStore {
 
   // Fetch all students at once
   fetchAllStudents = action(async () => {
-    // Use static flags to prevent repeated API calls
-    if (hasDataBeenFetched && this.allStudents.length > 0) {
-      console.log("Data already fetched, using cached data");
-      this.applyFiltersAndPagination();
-      return { students: this.students, totalItems: this.totalStudents.get(), totalPages: this.totalPages.get() };
-    }
-
-    // If a fetch is already in progress, don't start another one
-    if (isDataFetchInProgress) {
-      console.log("Data fetch already in progress, waiting...");
-      return { students: this.students, totalItems: this.totalStudents.get(), totalPages: this.totalPages.get() };
-    }
-
-    isDataFetchInProgress = true;
+    // Always fetch fresh data
     this.loading.set(true);
     this.error.set(null);
 
@@ -267,7 +247,7 @@ class StudentStore {
         sortOrder: this.sortOrder.get()
       };
 
-      console.log("Fetching all students - ONE TIME ONLY");
+      console.log("Fetching all students");
       const response = await fetchStudents(params);
       
       runInAction(() => {
@@ -280,10 +260,6 @@ class StudentStore {
         this.applyFiltersAndPagination();
       });
       
-      // Set the static flag to indicate data has been fetched
-      hasDataBeenFetched = true;
-      isDataFetchInProgress = false;
-      
       return response;
     } catch (error) {
       runInAction(() => {
@@ -291,7 +267,6 @@ class StudentStore {
         this.loading.set(false);
       });
       console.error('Error fetching all students:', error);
-      isDataFetchInProgress = false;
       throw error;
     }
   });

@@ -44,6 +44,26 @@ export const register = async (userData: {
   return response.data;
 };
 
+export const getAllUsers = async () => {
+  const response = await api.get('/auth/users');
+  return response.data;
+};
+
+export const updateUser = async (userId: string, userData: { 
+  name?: string; 
+  email?: string; 
+  role?: string;
+  class?: string;
+}) => {
+  const response = await api.put(`/auth/users/${userId}`, userData);
+  return response.data;
+};
+
+export const deleteUser = async (userId: string) => {
+  const response = await api.delete(`/auth/users/${userId}`);
+  return response.data;
+};
+
 export const logout = async () => {
   const response = await api.post('/auth/logout');
   localStorage.removeItem('token');

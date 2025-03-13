@@ -10,7 +10,7 @@ export const getFieldConfigs = (): FieldConfig[] => [
     id: 'gender', 
     label: 'Gender', 
     type: 'select', 
-    options: ['MALE', 'FEMALE', 'DIFFERENT'], 
+    options: ['M', 'F', 'DIFFERENT'], 
     editable: false 
   },
   { id: 'batch', label: 'Batch', type: 'select', editable: false },
@@ -39,7 +39,7 @@ export const getFieldConfigs = (): FieldConfig[] => [
     id: 'syllabus', 
     label: 'Syllabus', 
     type: 'select', 
-    options: ['STATE', 'CBSE', 'ICSC', 'OTHERS'], 
+    options: ['STATE', 'CBSE', 'ICSC', 'OTHER'], 
     editable: false 
   },
   { 

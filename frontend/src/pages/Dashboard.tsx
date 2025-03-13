@@ -55,9 +55,9 @@ const Dashboard: React.FC = observer(() => {
   // Count students by status
   const joinedStudents = allStudents.filter(s => s.joined === 'JOINED').length;
   const allotedStudents = allStudents.filter(s => s.joined === 'ALLOTED').length;
-  const joiningStudents = allStudents.filter(s => s.joined && s.joined.includes('JOINING SOON')).length;
+  const discontinuedStudents = allStudents.filter(s => s.joined === 'DISCONTINUED').length;
   const notJoiningStudents = allStudents.filter(s => s.joined === 'NOT JOINING').length;
-  const centrechangedStudents = allStudents.filter(s => s.joined && s.joined.includes('CENTRE CHANGE')).length;
+  const centrechangedStudents = allStudents.filter(s => s.joined === 'CENTRE CHANGE').length;
   
   // Count students with dues
   const studyMaterialDue = allStudents.filter(s => 
@@ -83,8 +83,15 @@ const Dashboard: React.FC = observer(() => {
   const hostelers = allStudents.length - dayScholars;
   
   // For mentors, also count students in their class
-  const mentorClassStudents = !isAdmin && user?.class 
-    ? allStudents.filter(student => student.classTeacher === user.name)
+  const mentorClassStudents = !isAdmin && user?.name 
+    ? allStudents.filter(student => {
+        // Convert the class teacher name to match the user's username format for comparison
+        const classTeacherAsUsername = student.classTeacher
+          .toUpperCase()
+          .replace(/\s+/g, '.');
+        
+        return classTeacherAsUsername === user.username;
+      })
     : [];
   
   if (loading || studentStore.isLoading) {
@@ -163,8 +170,8 @@ const Dashboard: React.FC = observer(() => {
         />
         
         <DashboardCard
-          title="Joining Soon"
-          value={joiningStudents}
+          title="Discontinued"
+          value={discontinuedStudents}
           icon={<FileSpreadsheet size={24} />}
           color="bg-amber-500"
         />

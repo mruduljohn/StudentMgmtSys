@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
 import { Calendar, Filter, RefreshCw, Search, Clock, User, FileText, Database } from 'lucide-react';
 import Layout from '../components/layout/Layout';
-import Table from '../components/ui/Table';
+import Table, { TableItem } from '../components/ui/Table';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Pagination from '../components/ui/Pagination';
 import { getAuditLogs } from '../api';
 import { useAuthStore } from '../store/authStore';
 
+// Original AuditLog interface from the API
 interface AuditLog {
   _id: string;
   userId: string;
@@ -16,8 +17,25 @@ interface AuditLog {
   action: string;
   entityType: string;
   entityId: string;
-  details: string;
+  details: Record<string, unknown>;
+  timestamp?: string;
+  createdAt: string;
+  user?: {
+    username: string;
+    name: string;
+    role: string;
+  };
+}
+
+// Safe table row interface with only string values
+interface AuditLogTableRow extends TableItem {
+  id: string;
   timestamp: string;
+  username: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  details: string;
 }
 
 interface AuditLogFilters {
@@ -31,7 +49,8 @@ const AuditLogs: React.FC = observer(() => {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
   
-  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [logs, setLogs] = useState<AuditLogTableRow[]>([]);
+  const [rawLogs, setRawLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -56,6 +75,38 @@ const AuditLogs: React.FC = observer(() => {
     { id: 'details', label: 'Details', width: '300px' },
   ];
   
+  // Convert AuditLog to AuditLogTableRow
+  const convertToTableRow = (log: AuditLog): AuditLogTableRow => {
+    // Format details as a string
+    let formattedDetails = 'No details';
+    
+    if (log.details) {
+      try {
+        if (typeof log.details === 'object') {
+          // Convert object to a readable string format
+          formattedDetails = Object.entries(log.details)
+            .map(([key, value]) => `${key}: ${String(value)}`)
+            .join(', ');
+        } else {
+          formattedDetails = String(log.details);
+        }
+      } catch (e) {
+        console.error('Error formatting details:', e);
+        formattedDetails = 'Error formatting details';
+      }
+    }
+    
+    return {
+      id: log._id,
+      timestamp: new Date(log.createdAt).toLocaleString(),
+      username: log.user?.username || log.username || 'Unknown',
+      action: String(log.action),
+      entityType: String(log.entityType),
+      entityId: String(log.entityId),
+      details: formattedDetails
+    };
+  };
+  
   // Fetch logs on component mount and when dependencies change
   useEffect(() => {
     if (!isAdmin) return;
@@ -74,16 +125,32 @@ const AuditLogs: React.FC = observer(() => {
         
         const response = await getAuditLogs(params);
         
-        setLogs(response.logs.map((log: AuditLog) => ({
-          ...log,
-          timestamp: new Date(log.timestamp).toLocaleString(),
-          id: log._id, // Add id property for table component
-        })));
-        setTotalPages(response.totalPages);
-        setTotalLogs(response.totalLogs);
-        setLoading(false);
+        // Add defensive checks to prevent errors
+        if (response && response.auditLogs && Array.isArray(response.auditLogs)) {
+          const apiLogs = response.auditLogs as AuditLog[];
+          setRawLogs(apiLogs);
+          
+          // Convert to safe table rows
+          const tableRows = apiLogs.map(convertToTableRow);
+          setLogs(tableRows);
+          
+          // Set pagination data with defensive checks
+          setTotalPages(response.pagination?.pages || 1);
+          setTotalLogs(response.pagination?.total || 0);
+        } else {
+          console.error('Invalid response format:', response);
+          setRawLogs([]);
+          setLogs([]);
+          setTotalPages(1);
+          setTotalLogs(0);
+        }
       } catch (error) {
         console.error('Error fetching audit logs:', error);
+        setRawLogs([]);
+        setLogs([]);
+        setTotalPages(1);
+        setTotalLogs(0);
+      } finally {
         setLoading(false);
       }
     };
@@ -292,7 +359,7 @@ const AuditLogs: React.FC = observer(() => {
           <div>
             <p className="text-sm text-gray-500">User Actions</p>
             <p className="text-xl font-semibold">
-              {logs.filter(log => log.entityType === 'USER').length}
+              {rawLogs.filter(log => log.entityType === 'USER').length}
             </p>
           </div>
         </div>
@@ -304,7 +371,7 @@ const AuditLogs: React.FC = observer(() => {
           <div>
             <p className="text-sm text-gray-500">Student Actions</p>
             <p className="text-xl font-semibold">
-              {logs.filter(log => log.entityType === 'STUDENT').length}
+              {rawLogs.filter(log => log.entityType === 'STUDENT').length}
             </p>
           </div>
         </div>
@@ -316,7 +383,7 @@ const AuditLogs: React.FC = observer(() => {
           <div>
             <p className="text-sm text-gray-500">Config Actions</p>
             <p className="text-xl font-semibold">
-              {logs.filter(log => log.entityType === 'CONFIG').length}
+              {rawLogs.filter(log => log.entityType === 'CONFIG').length}
             </p>
           </div>
         </div>
@@ -331,10 +398,7 @@ const AuditLogs: React.FC = observer(() => {
         ) : logs.length > 0 ? (
           <Table
             columns={columns}
-            data={logs.map(log => ({
-              ...log,
-              id: log._id,
-            }))}
+            data={logs}
             emptyMessage="No audit logs found"
           />
         ) : (

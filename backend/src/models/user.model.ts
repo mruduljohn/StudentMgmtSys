@@ -6,6 +6,8 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   name: { type: String, required: true },
   role: { type: String, enum: ["ADMIN", "MENTOR"], required: true },
+  // For MENTOR role only - assigned class
+  class: { type: String },
   // For MENTOR role only
   assignedStudents: [{ 
     type: mongoose.Schema.Types.ObjectId, 

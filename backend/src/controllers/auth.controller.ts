@@ -50,7 +50,8 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
         username: user.username,
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        class: user.class
       }
     });
   } catch (error) {
@@ -61,7 +62,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 
 export const registerUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { username, email, password, name, role } = req.body;
+    const { username, email, password, name, role, class: assignedClass } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ 
@@ -93,7 +94,8 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
       email,
       password: hashedPassword,
       name,
-      role
+      role,
+      class: role === "MENTOR" ? assignedClass : undefined
     });
 
     // Log user creation
@@ -102,7 +104,7 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
       action: "CREATE",
       entityType: "USER",
       entityId: newUser._id,
-      details: { username, email, role },
+      details: { username, email, role, class: assignedClass },
       ipAddress: req.ip
     });
 
@@ -113,11 +115,143 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
         username: newUser.username,
         email: newUser.email,
         name: newUser.name,
-        role: newUser.role
+        role: newUser.role,
+        class: newUser.class
       }
     });
   } catch (error) {
     console.error("Registration error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get all users (Admin only)
+export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Only ADMIN can view all users
+    if (req.user?.role !== "ADMIN") {
+      res.status(403).json({ message: "Access denied. Admin only." });
+      return;
+    }
+
+    // Get all users, excluding password field
+    const users = await User.find({}, { password: 0 });
+
+    // Format the users to include the id field properly
+    const formattedUsers = users.map(user => ({
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      class: user.class
+    }));
+
+    res.json({ users: formattedUsers });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Update user (Admin only)
+export const updateUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.params.id;
+    const { name, email, role, class: assignedClass } = req.body;
+
+    // Only ADMIN can update users
+    if (req.user?.role !== "ADMIN") {
+      res.status(403).json({ message: "Access denied. Admin only." });
+      return;
+    }
+
+    // Find user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    // Update user fields
+    user.name = name || user.name;
+    user.email = email || user.email;
+    
+    // Only update role if provided
+    if (role) {
+      user.role = role;
+    }
+
+    // Update class if user is a MENTOR
+    if (role === "MENTOR" || user.role === "MENTOR") {
+      user.class = assignedClass || user.class;
+    }
+
+    // Save updated user
+    await user.save();
+
+    // Log user update
+    await Audit.create({
+      user: req.user?.id,
+      action: "UPDATE",
+      entityType: "USER",
+      entityId: user._id,
+      details: { username: user.username, role: user.role },
+      ipAddress: req.ip
+    });
+
+    // Return updated user without password
+    const updatedUser = await User.findById(userId, { password: 0 });
+    res.json({ 
+      message: "User updated successfully",
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error("Error updating user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Delete user (Admin only)
+export const deleteUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.params.id;
+
+    // Only ADMIN can delete users
+    if (req.user?.role !== "ADMIN") {
+      res.status(403).json({ message: "Access denied. Admin only." });
+      return;
+    }
+
+    // Prevent deleting yourself
+    if (userId === req.user?.id) {
+      res.status(400).json({ message: "Cannot delete your own account" });
+      return;
+    }
+
+    // Find user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    // Delete user
+    await User.findByIdAndDelete(userId);
+
+    // Log user deletion
+    await Audit.create({
+      user: req.user?.id,
+      action: "DELETE",
+      entityType: "USER",
+      entityId: user._id,
+      details: { username: user.username, role: user.role },
+      ipAddress: req.ip
+    });
+
+    res.json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting user:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -129,7 +263,16 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
       res.status(404).json({ message: "User not found" });
       return;
     }
-    res.json(user);
+    
+    // Format the response to include all necessary fields
+    res.json({
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      class: user.class
+    });
   } catch (error) {
     console.error("Get current user error:", error);
     res.status(500).json({ message: "Server error" });

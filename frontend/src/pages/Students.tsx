@@ -14,6 +14,7 @@ import { useStudentStore } from '../store/studentStore';
 import { useAuthStore } from '../store/authStore';
 import { Student } from '../types';
 import { studentsToExcel, downloadExcel } from '../utils/excelUtils';
+import PasswordConfirmModal from '../components/ui/PasswordConfirmModal';
 
 // Define types for bulk actions and sort options
 // interface BulkAction {
@@ -86,13 +87,15 @@ const Students: React.FC = observer(() => {
   const [selectedStudent, setSelectedStudent] = useState<ExtendedStudent | null>(null);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [storeInitialized, setStoreInitialized] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [deleteAction, setDeleteAction] = useState<'single' | 'bulk'>('single');
   
   // Initialize store on component mount
   useEffect(() => {
     const initializeStore = async () => {
       try {
         if (!studentStore.isDataLoaded) {
-          await studentStore.init();
+        await studentStore.init();
         }
         setStoreInitialized(true);
       } catch (error) {
@@ -165,7 +168,9 @@ const Students: React.FC = observer(() => {
   
   const handleDelete = (student: ExtendedStudent) => {
     setSelectedStudent(student);
-    setIsDeleteModalOpen(true);
+    // Open password confirmation modal instead of delete modal directly
+    setDeleteAction('single');
+    setIsPasswordModalOpen(true);
   };
   
   const confirmDelete = async () => {
@@ -184,17 +189,21 @@ const Students: React.FC = observer(() => {
   };
   
   const handleBulkDelete = async () => {
-    if (window.confirm(`Are you sure you want to delete ${selectedRows.length} students?`)) {
-      try {
-        console.log(`Bulk deleting ${selectedRows.length} students`);
-        // Use Promise.all to wait for all delete operations to complete
-        await Promise.all(selectedRows.map(id => studentStore.deleteStudent(id)));
-        setSelectedRows([]);
-        // No need to call fetchStudents since the store already updates
-      } catch (error) {
-        console.error("Error deleting students:", error);
-        alert("Failed to delete some students. Please try again.");
-      }
+    // Open password confirmation modal instead of confirming directly
+    setDeleteAction('bulk');
+    setIsPasswordModalOpen(true);
+  };
+  
+  const confirmBulkDelete = async () => {
+    try {
+      console.log(`Bulk deleting ${selectedRows.length} students`);
+      // Use Promise.all to wait for all delete operations to complete
+      await Promise.all(selectedRows.map(id => studentStore.deleteStudent(id)));
+      setSelectedRows([]);
+      // No need to call fetchStudents since the store already updates
+    } catch (error) {
+      console.error("Error deleting students:", error);
+      alert("Failed to delete some students. Please try again.");
     }
   };
   
@@ -463,32 +472,32 @@ const Students: React.FC = observer(() => {
     }
     
     return (
-      <div className="flex space-x-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleEdit(student);
-          }}
-          disabled={!canEdit}
-          title={!canEdit ? "You can only edit students assigned to you" : "Edit student"}
-        >
-          <Edit size={16} />
-        </Button>
-        {isAdmin && (
+        <div className="flex space-x-2">
           <Button
-            variant="danger"
+            variant="secondary"
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              handleDelete(student);
+              handleEdit(student);
             }}
+          disabled={!canEdit}
+          title={!canEdit ? "You can only edit students assigned to you" : "Edit student"}
           >
-            <Trash2 size={16} />
+            <Edit size={16} />
           </Button>
-        )}
-      </div>
+          {isAdmin && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(student);
+              }}
+            >
+              <Trash2 size={16} />
+            </Button>
+          )}
+        </div>
     );
   };
 
@@ -672,7 +681,7 @@ const Students: React.FC = observer(() => {
   //     alert("Failed to export students. Please try again.");
   //   }
   // };
-
+  
   return (
     <Layout>
       {/* Hidden elements to use variables and prevent linter errors */}
@@ -680,10 +689,10 @@ const Students: React.FC = observer(() => {
       {renderBulkActions()}
       
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-          <h1 className="text-2xl font-bold text-gray-800">Students</h1>
-          
-          <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <h1 className="text-2xl font-bold text-gray-800">Students</h1>
+        
+        <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
               onClick={handleExportFiltered}
@@ -694,16 +703,16 @@ const Students: React.FC = observer(() => {
             </Button>
             
             {isAdmin && (
-              <Button
-                variant="primary"
-                onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center"
-              >
-                <Plus size={16} className="mr-1" />
-                Add Student
-              </Button>
-            )}
-            
+            <Button
+              variant="primary"
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center"
+            >
+              <Plus size={16} className="mr-1" />
+              Add Student
+            </Button>
+          )}
+          
             <Button
               variant="secondary"
               onClick={() => setIsFilterModalOpen(true)}
@@ -750,12 +759,12 @@ const Students: React.FC = observer(() => {
             />
           </div>
         </div>
-
+        
         {/* Students table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <Table
-            columns={columns}
-            data={studentsWithPaymentStatus}
+        <Table
+          columns={columns}
+          data={studentsWithPaymentStatus}
             isSelectable={isAdmin}
             emptyMessage="No students found"
             sortField={studentStore.getSortField}
@@ -836,6 +845,23 @@ const Students: React.FC = observer(() => {
           </div>
         </div>
       </Modal>
+      
+      {/* Password Confirmation Modal */}
+      <PasswordConfirmModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+        onConfirm={() => {
+          if (deleteAction === 'single') {
+            setIsDeleteModalOpen(true);
+          } else {
+            confirmBulkDelete();
+          }
+        }}
+        title="Confirm Delete"
+        message={deleteAction === 'single' 
+          ? `To delete student ${selectedStudent?.name}, please type CONFIRMDELETE below.` 
+          : `To delete ${selectedRows.length} students, please type CONFIRMDELETE below.`}
+      />
       
       {/* Delete Confirmation Modal */}
       <Modal

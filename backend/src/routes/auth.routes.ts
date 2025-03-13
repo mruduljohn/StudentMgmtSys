@@ -3,7 +3,10 @@ import {
   loginUser, 
   registerUser, 
   getCurrentUser, 
-  logoutUser 
+  logoutUser,
+  getAllUsers,
+  updateUser,
+  deleteUser
 } from "../controllers/auth.controller";
 import { authMiddleware, adminOnly } from "../middlewares/auth.middleware";
 
@@ -99,5 +102,87 @@ router.get("/me", authMiddleware, getCurrentUser);
  *         description: Logged out successfully
  */
 router.post("/logout", authMiddleware, logoutUser);
+
+/**
+ * @swagger
+ * /auth/users:
+ *   get:
+ *     summary: Get all users (Admin only)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all users
+ *       403:
+ *         description: Not authorized
+ */
+router.get("/users", authMiddleware, adminOnly, getAllUsers);
+
+/**
+ * @swagger
+ * /auth/users/{id}:
+ *   put:
+ *     summary: Update user (Admin only)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [ADMIN, MENTOR]
+ *               class:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User updated successfully
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: User not found
+ */
+router.put("/users/:id", authMiddleware, adminOnly, updateUser);
+
+/**
+ * @swagger
+ * /auth/users/{id}:
+ *   delete:
+ *     summary: Delete user (Admin only)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *       400:
+ *         description: Cannot delete your own account
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: User not found
+ */
+router.delete("/users/:id", authMiddleware, adminOnly, deleteUser);
 
 export default router;

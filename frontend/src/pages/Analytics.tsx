@@ -53,6 +53,7 @@ const Analytics: React.FC = observer(() => {
     'PETER CLAVER': 38,
     'LITTLE FLOWER': 72,
     'ST.AUGUSTINE': 46,
+    
   };
   
   useEffect(() => {
@@ -183,8 +184,8 @@ const Analytics: React.FC = observer(() => {
         
         // Sort hostel summaries, but put DAY SCHOLAR first
         const sortedHostelSummaries = Array.from(hostelMap.values()).sort((a, b) => {
-          if (a.hostel === 'DAY SCHOLAR') return -1;
-          if (b.hostel === 'DAY SCHOLAR') return 1;
+          if (a.hostel === 'DS') return -1;
+          if (b.hostel === 'DS') return 1;
           return a.hostel.localeCompare(b.hostel);
         });
         

@@ -376,6 +376,43 @@ const ensureValidEnum = (value: string | undefined | null, allowedValues: string
   return allowedValues.includes(value) ? value : defaultValue;
 };
 
+// Helper function to map CSV column names to model field names
+const mapCSVColumnToModelField = (csvColumn: string): string | null => {
+  const mapping: Record<string, string> = {
+    'Sl No': 'slNo',
+    'NAME': 'name',
+    'STUDENT ID': 'studentId',
+    'PHONE NUMBER': 'phoneNumber',
+    'GENDER': 'gender',
+    'BATCH': 'batch',
+    'CLASS TEACHER': 'classTeacher',
+    'Hostel': 'hostel',
+    'Stream': 'stream',
+    'PROGRAM': 'program',
+    'Study Material': 'studyMaterial',
+    'Uniform': 'uniform',
+    'ID Card': 'idCard',
+    'Tab': 'tab',
+    'JOINED': 'joined',
+    'Syllabus': 'syllabus',
+    'Percentage of +2 Marks': 'percentageOfPlus2Marks',
+    '% of +2 Marks': 'percentageOfPlus2Marks',
+    'NEET Score': 'neetScore',
+    'Remarks': 'remarks',
+    'Remarks 1': 'remarks1',
+    'Remarks 2': 'remarks2',
+    'Remarks 3': 'remarks3',
+    'Remarks 4': 'remarks4',
+    'Fee Due': 'feeDue',
+    'Flag1': 'flag1',
+    'Flag2': 'flag2',
+    'Flag3': 'flag3',
+    'Flag4': 'flag4'
+  };
+  
+  return mapping[csvColumn] || null;
+};
+
 // Upload CSV file
 export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<void> => {
   try {
@@ -455,8 +492,20 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
         const existingStudent = await Student.findOne({ studentId: studentData.studentId });
         
         if (existingStudent) {
-          // Update existing student
-          await Student.findByIdAndUpdate(existingStudent._id, studentData);
+          // Create an update object with only the fields that are present in the CSV
+          const updateData: Record<string, any> = {};
+          
+          // Iterate through the record object to check which fields are present in the CSV
+          for (const key in record) {
+            const mappedKey = mapCSVColumnToModelField(key);
+            if (mappedKey && record[key] !== undefined && record[key] !== '') {
+              // Only include fields that have values in the CSV
+              updateData[mappedKey] = studentData[mappedKey as keyof typeof studentData];
+            }
+          }
+          
+          // Update existing student with only the fields from the CSV
+          await Student.findByIdAndUpdate(existingStudent._id, updateData);
           results.push({ 
             studentId: studentData.studentId, 
             name: studentData.name, 
@@ -498,6 +547,10 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
     // Clean up the temporary file
     fs.unlinkSync(filePath);
     
+    // Count created and updated students
+    const createdCount = results.filter(r => r.status === 'created').length;
+    const updatedCount = results.filter(r => r.status === 'updated').length;
+    
     // Log CSV upload
     await Audit.create({
       user: req.user?.id,
@@ -506,6 +559,8 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
       details: { 
         filename: req.file.originalname,
         recordsProcessed: results.length,
+        created: createdCount,
+        updated: updatedCount,
         errors: errors.length
       },
       ipAddress: req.ip
@@ -518,7 +573,10 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
         successful: results.length,
         failed: errors.length
       },
-      errors: errors.length > 0 ? errors : undefined
+      details: {
+        created: createdCount,
+        updated: updatedCount
+      }
     });
   } catch (error) {
     console.error("Error uploading CSV:", error);

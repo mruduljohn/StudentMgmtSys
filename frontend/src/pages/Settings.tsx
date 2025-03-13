@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Save, RefreshCw } from 'lucide-react';
+import { Save} from 'lucide-react';
+// import { RefreshCw } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Input from '../components/ui/Input';
+import TextArea from '../components/ui/TextArea';
 import Button from '../components/ui/Button';
 import { useStudentStore } from '../store/studentStore';
 import { BatchConfig, RemarksConfig, FlagsConfig } from '../types';
-import { initializeDefaultConfigs } from '../api';
+// import { initializeDefaultConfigs } from '../api';
 
 const Settings: React.FC = () => {
   const { 
@@ -16,7 +18,7 @@ const Settings: React.FC = () => {
     updateRemarksConfig,
     updateFlagsConfig,
     isLoading,
-    fetchAllConfigs
+    // fetchAllConfigs
   } = useStudentStore();
   
   const [batchSettings, setBatchSettings] = useState<BatchConfig>({ ...batchConfig });
@@ -47,7 +49,7 @@ const Settings: React.FC = () => {
   ];
   
   const predefinedHostels = [
-    'DAY SCHOLAR', 'ST.ANNS', 'MARIGOLD GRAND', 'HOSTEL REQUIRED', 'ST.JOHNS', 
+    'DS', 'ST.ANNS', 'MARIGOLD GRAND', 'HOSTEL REQUIRED', 'ST.JOHNS', 
     'THE GUARDIAN', 'NEST GRAND', 'LAVERNA', 'B MADONA', 'B MARTHOMA', 'B ST.MARYS', 
     'PETER CLAVER', 'LITTLE FLOWER', 'ST.AUGUSTINE', 'SDV'
   ];
@@ -66,7 +68,19 @@ const Settings: React.FC = () => {
     e: React.ChangeEvent<HTMLTextAreaElement>,
     field: keyof BatchConfig
   ) => {
-    const values = e.target.value.split('\n').filter(Boolean);
+    // Keep all lines including empty ones, but trim whitespace
+    const values = e.target.value.split('\n')
+      .map(line => line.trim())
+      .filter((line, index, array) => {
+        // Keep non-empty lines
+        if (line !== '') return true;
+        
+        // Keep empty lines that are not at the end
+        if (index < array.length - 1) return true;
+        
+        return false;
+      });
+    
     setBatchSettings(prev => ({
       ...prev,
       [field]: values,
@@ -123,19 +137,19 @@ const Settings: React.FC = () => {
     }));
   };
   
-  const handleInitializeDefaults = async () => {
-    try {
-      await initializeDefaultConfigs();
-      // Refresh the store
-      await fetchAllConfigs();
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (error) {
-      console.error('Error initializing defaults:', error);
-      setSaveError(true);
-      setTimeout(() => setSaveError(false), 3000);
-    }
-  };
+  // const handleInitializeDefaults = async () => {
+  //   try {
+  //     await initializeDefaultConfigs();
+  //     // Refresh the store
+  //     await fetchAllConfigs();
+  //     setSaveSuccess(true);
+  //     setTimeout(() => setSaveSuccess(false), 3000);
+  //   } catch (error) {
+  //     console.error('Error initializing defaults:', error);
+  //     setSaveError(true);
+  //     setTimeout(() => setSaveError(false), 3000);
+  //   }
+  // };
   
   return (
     <Layout>
@@ -146,7 +160,7 @@ const Settings: React.FC = () => {
             Configure system settings and field options
           </p>
         </div>
-        <Button
+        {/* <Button
           variant="secondary"
           onClick={handleInitializeDefaults}
           className="flex items-center"
@@ -154,7 +168,7 @@ const Settings: React.FC = () => {
         >
           <RefreshCw size={16} className="mr-2" />
           Initialize Defaults
-        </Button>
+        </Button> */}
       </div>
       
       {saveSuccess && (
@@ -192,11 +206,11 @@ const Settings: React.FC = () => {
                 Load Predefined
               </Button>
             </div>
-            <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            <TextArea
               rows={5}
               value={batchSettings.batches.join('\n')}
               onChange={(e) => handleBatchChange(e, 'batches')}
+              fullWidth
             />
           </div>
           
@@ -214,11 +228,11 @@ const Settings: React.FC = () => {
                 Load Predefined
               </Button>
             </div>
-            <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            <TextArea
               rows={5}
               value={batchSettings.teachers.join('\n')}
               onChange={(e) => handleBatchChange(e, 'teachers')}
+              fullWidth
             />
           </div>
           
@@ -236,11 +250,11 @@ const Settings: React.FC = () => {
                 Load Predefined
               </Button>
             </div>
-            <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            <TextArea
               rows={5}
               value={batchSettings.hostels.join('\n')}
               onChange={(e) => handleBatchChange(e, 'hostels')}
+              fullWidth
             />
           </div>
           
@@ -258,11 +272,11 @@ const Settings: React.FC = () => {
                 Load Predefined
               </Button>
             </div>
-            <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            <TextArea
               rows={5}
               value={batchSettings.programs.join('\n')}
               onChange={(e) => handleBatchChange(e, 'programs')}
+              fullWidth
             />
           </div>
           
@@ -280,11 +294,11 @@ const Settings: React.FC = () => {
                 Load Predefined
               </Button>
             </div>
-            <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            <TextArea
               rows={5}
               value={batchSettings.streams.join('\n')}
               onChange={(e) => handleBatchChange(e, 'streams')}
+              fullWidth
             />
           </div>
         </div>

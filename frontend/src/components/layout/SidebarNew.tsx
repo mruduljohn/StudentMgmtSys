@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   Users, 
+  UserCog, 
   Home, 
   Settings, 
   FileSpreadsheet,
   ChevronLeft,
   ChevronRight,
   BarChart2,
-  ClipboardList,
-  UserPlus
+  ClipboardList
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -18,8 +18,9 @@ const Sidebar: React.FC = () => {
   const isAdmin = user?.role === 'ADMIN';
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  // Modified linkClass to center icons when collapsed
   const linkClass = ({ isActive }: { isActive: boolean }) => 
-    `flex items-center ${isCollapsed ? 'justify-center' : 'px-4'} py-2 my-1 text-sm rounded-md transition-colors ${
+    `flex ${isCollapsed ? 'justify-center' : 'items-center'} px-4 py-2 my-1 text-sm rounded-md transition-colors ${
       isActive 
         ? 'bg-blue-700 text-white' 
         : 'text-gray-700 hover:bg-blue-100'
@@ -39,39 +40,39 @@ const Sidebar: React.FC = () => {
           
           <div className="py-4 clear-both">
             <NavLink to="/" className={linkClass}>
-              <Home className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
+              <Home className="h-5 w-5" />
               {!isCollapsed && <span className="ml-3">Dashboard</span>}
             </NavLink>
             
             <NavLink to="/students" className={linkClass}>
-              <Users className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
+              <Users className="h-5 w-5" />
               {!isCollapsed && <span className="ml-3">Students</span>}
             </NavLink>
             
             <NavLink to="/analytics" className={linkClass}>
-              <BarChart2 className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
+              <BarChart2 className="h-5 w-5" />
               {!isCollapsed && <span className="ml-3">Analytics</span>}
             </NavLink>
             
             {isAdmin && (
               <>
-                <NavLink to="/users" className={linkClass}>
-                  <UserPlus className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
-                  {!isCollapsed && <span className="ml-3">Users</span>}
+                <NavLink to="/mentors" className={linkClass}>
+                  <UserCog className="h-5 w-5" />
+                  {!isCollapsed && <span className="ml-3">Mentors</span>}
                 </NavLink>
                 
                 <NavLink to="/import-export" className={linkClass}>
-                  <FileSpreadsheet className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
+                  <FileSpreadsheet className="h-5 w-5" />
                   {!isCollapsed && <span className="ml-3">Import/Export</span>}
                 </NavLink>
                 
                 <NavLink to="/audit-logs" className={linkClass}>
-                  <ClipboardList className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
+                  <ClipboardList className="h-5 w-5" />
                   {!isCollapsed && <span className="ml-3">Audit Logs</span>}
                 </NavLink>
                 
                 <NavLink to="/settings" className={linkClass}>
-                  <Settings className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
+                  <Settings className="h-5 w-5" />
                   {!isCollapsed && <span className="ml-3">Settings</span>}
                 </NavLink>
               </>
@@ -135,4 +136,4 @@ const Sidebar: React.FC = () => {
   );
 };
 
-export default Sidebar;
+export default Sidebar; 

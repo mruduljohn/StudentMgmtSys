@@ -5,11 +5,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
-import Mentors from './pages/Mentors';
 import ImportExport from './pages/ImportExport';
 import Settings from './pages/Settings';
 import AuditLogs from './pages/AuditLogs';
 import Analytics from './pages/Analytics';
+import UserManagement from './pages/UserManagement';
 
 // Stores
 import { useAuthStore } from './store/authStore';
@@ -68,11 +68,11 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<ProtectedRoute element={<Dashboard />} />} />
         <Route path="/students" element={<ProtectedRoute element={<Students />} />} />
-        <Route path="/mentors" element={<ProtectedRoute element={<Mentors />} adminOnly />} />
         <Route path="/import-export" element={<ProtectedRoute element={<ImportExport />} adminOnly />} />
         <Route path="/settings" element={<ProtectedRoute element={<Settings />} adminOnly />} />
         <Route path="/audit-logs" element={<ProtectedRoute element={<AuditLogs />} adminOnly />} />
         <Route path="/analytics" element={<ProtectedRoute element={<Analytics />} />} />
+        <Route path="/users" element={<ProtectedRoute element={<UserManagement />} adminOnly />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

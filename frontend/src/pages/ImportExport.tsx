@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Download, FileSpreadsheet, AlertCircle } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, AlertCircle, FileDown } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/ui/Button';
 import { useStudentStore } from '../store/studentStore';
 import { studentsToExcel, downloadExcel } from '../utils/excelUtils';
+import * as XLSX from 'xlsx';
 
 const ImportExport: React.FC = () => {
   const studentStore = useStudentStore();
@@ -26,7 +27,16 @@ const ImportExport: React.FC = () => {
       const result = await studentStore.uploadCSV(file);
       
       if (result && result.results) {
-        setUploadSuccess(`Successfully processed ${result.results.successful} students (${result.results.failed} failed)`);
+        // Check if the result includes details about created vs updated students
+        if (result.details && (result.details.created || result.details.updated)) {
+          setUploadSuccess(
+            `Successfully processed ${result.results.successful} students ` +
+            `(${result.details.created || 0} created, ${result.details.updated || 0} updated, ` +
+            `${result.results.failed} failed)`
+          );
+        } else {
+          setUploadSuccess(`Successfully processed ${result.results.successful} students (${result.results.failed} failed)`);
+        }
       } else {
         setUploadError('Failed to upload file');
       }
@@ -43,18 +53,105 @@ const ImportExport: React.FC = () => {
   };
   
   const handleExport = () => {
-    if (studentStore.getStudents.length === 0) {
+    if (studentStore.getAllStudents.length === 0) {
       alert('No students to export');
       return;
     }
     
     try {
-      const excelData = studentsToExcel(studentStore.getStudents);
+      const excelData = studentsToExcel(studentStore.getAllStudents);
       downloadExcel(excelData, 'students_export.xlsx');
     } catch (err) {
       console.error('Error exporting to Excel:', err);
       alert('Failed to export students data');
     }
+  };
+  
+  const handleDownloadTemplate = () => {
+    // Create a template with all required fields and a sample row
+    const templateData = [
+      {
+        'Sl No': '391',
+        'NAME': 'John Doe',
+        'STUDENT ID': '111111',
+        'PHONE NUMBER': '9876543210',
+        'GENDER': 'M',
+        'BATCH': '25TSRFIX',
+        'CLASS TEACHER': 'DEEPA.MD.(WB)',
+        'Hostel': 'DS',
+        'Stream': 'FOUNDATION',
+        'PROGRAM': 'FOUNDATION',
+        'Study Material': 'NOT RECEIVED',
+        'Uniform': 'RECEIVED',
+        'ID Card': 'NOT RECEIVED',
+        'Tab': 'REQUESTED NOT PAID',
+        'JOINED': 'ALLOTED',
+        'Syllabus': 'OTHER',
+        '% of +2 Marks': '89',
+        'NEET Score': '605',
+        'Remarks': 'REMARK 1',
+        'Remarks 1': 'REMARK 2',
+        'Remarks 2': '',
+        'Remarks 3': '',
+        'Remarks 4': '',
+        'Fee Due': '11300',
+        'Flag1': '1',
+        'Flag2': '',
+        'Flag3': '',
+        'Flag4': ''
+      },
+      {
+        'Sl No': '',
+        'NAME': '',
+        'STUDENT ID': '',
+        'PHONE NUMBER': '',
+        'GENDER': '',
+        'BATCH': '',
+        'CLASS TEACHER': '',
+        'Hostel': '',
+        'Stream': '',
+        'PROGRAM': '',
+        'Study Material': '',
+        'Uniform': '',
+        'ID Card': '',
+        'Tab': '',
+        'JOINED': '',
+        'Syllabus': '',
+        '% of +2 Marks': '',
+        'NEET Score': '',
+        'Remarks': '',
+        'Remarks 1': '',
+        'Remarks 2': '',
+        'Remarks 3': '',
+        'Remarks 4': '',
+        'Fee Due': '',
+        'Flag1': '',
+        'Flag2': '',
+        'Flag3': '',
+        'Flag4': ''
+      }
+    ];
+    
+    // Convert to Excel and download
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Student Template');
+    
+    // Generate Excel file
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    
+    // Download file
+    const fileName = 'student_template.xlsx';
+    
+    // Create a download link and trigger it
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(data);
+    link.download = fileName;
+    link.click();
+    setTimeout(() => {
+      window.URL.revokeObjectURL(link.href);
+    }, 100);
   };
   
   return (
@@ -76,6 +173,10 @@ const ImportExport: React.FC = () => {
           
           <p className="text-gray-600 mb-4">
             Upload an Excel file with student data. The file should have columns matching the student fields.
+            <br /><br />
+            <strong>Note:</strong> If the Excel file contains students with IDs that already exist in the system, 
+            their information will be updated with the new values from the file. Only the fields included in the 
+            Excel file will be updated; other fields will remain unchanged.
           </p>
           
           {uploadError && (
@@ -100,17 +201,28 @@ const ImportExport: React.FC = () => {
               className="hidden"
               id="file-upload"
             />
-            <label htmlFor="file-upload">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <label htmlFor="file-upload">
+                <Button
+                  variant="primary"
+                  className="flex items-center"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  <FileSpreadsheet size={16} className="mr-2" />
+                  {isUploading ? 'Uploading...' : 'Select Excel File'}
+                </Button>
+              </label>
+              
               <Button
-                variant="primary"
+                variant="secondary"
                 className="flex items-center"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
+                onClick={handleDownloadTemplate}
               >
-                <FileSpreadsheet size={16} className="mr-2" />
-                {isUploading ? 'Uploading...' : 'Select Excel File'}
+                <FileDown size={16} className="mr-2" />
+                Download Template
               </Button>
-            </label>
+            </div>
           </div>
           
           <div className="mt-4 text-sm text-gray-500">
@@ -142,7 +254,7 @@ const ImportExport: React.FC = () => {
               variant="success"
               className="flex items-center"
               onClick={handleExport}
-              disabled={studentStore.getStudents.length === 0}
+              disabled={studentStore.getAllStudents.length === 0}
             >
               <FileSpreadsheet size={16} className="mr-2" />
               Export to Excel
@@ -150,8 +262,8 @@ const ImportExport: React.FC = () => {
           </div>
           
           <div className="mt-4 text-sm text-gray-500">
-            <p>Total students: {studentStore.getStudents.length}</p>
-            {studentStore.getStudents.length === 0 && (
+            <p>Total students: {studentStore.getAllStudents.length}</p>
+            {studentStore.getAllStudents.length === 0 && (
               <p className="text-yellow-600 mt-2">
                 No students to export. Import students first.
               </p>

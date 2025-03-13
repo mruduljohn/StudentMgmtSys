@@ -66,7 +66,7 @@ async function seedDefaultConfigs(adminId: mongoose.Types.ObjectId) {
       },
       {
         category: "hostels",
-        values: ['DAY SCHOLAR', 'ST.ANNS', 'MARIGOLD GRAND', 'HOSTEL REQUIRED', 'ST.JOHNS', 
+        values: ['DS', 'ST.ANNS', 'MARIGOLD GRAND', 'HOSTEL REQUIRED', 'ST.JOHNS', 
     'THE GUARDIAN', 'NEST GRAND', 'LAVERNA', 'B MADONA', 'B MARTHOMA', 'B ST.MARYS', 
     'PETER CLAVER', 'LITTLE FLOWER', 'ST.AUGUSTINE', 'SDV']
       },
