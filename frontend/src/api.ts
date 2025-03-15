@@ -1,8 +1,27 @@
 import axios from 'axios';
-import { Student } from './types';
+import { Student, Hour } from './types';
 
 // Get API base URL from environment variable or use default
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+// Add debugging to see what's happening with the environment variable
+console.log('Environment variables:', import.meta.env);
+console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+
+// Try to get the API URL from different sources
+let API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+// If running in a browser, try to determine the API URL dynamically
+if (!API_BASE_URL && typeof window !== 'undefined') {
+  // Get the current hostname (e.g., 192.168.8.80 or localhost)
+  const hostname = window.location.hostname;
+  API_BASE_URL = `http://${hostname}:5000/api`;
+  console.log('Dynamically determined API_BASE_URL:', API_BASE_URL);
+} else if (!API_BASE_URL) {
+  // Fallback to localhost if all else fails
+  API_BASE_URL = 'http://localhost:5000/api';
+  console.log('Using fallback API_BASE_URL:', API_BASE_URL);
+} else {
+  console.log('Using environment variable API_BASE_URL:', API_BASE_URL);
+}
 
 // Create axios instance with base URL
 const api = axios.create({
@@ -15,8 +34,12 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  console.log('API Request to:', (config.baseURL || '') + (config.url || ''));
   return config;
 });
+
+// Export the api instance as the default export
+export default api;
 
 // Authentication APIs
 export const login = async (credentials: { username: string; password: string }) => {
@@ -274,4 +297,64 @@ export const getAuditStats = async () => {
   return response.data;
 };
 
-export default api;
+// Hour APIs
+export const fetchHours = async (params?: Record<string, string | number | boolean | undefined>) => {
+  const queryParams = params ? new URLSearchParams(
+    Object.entries(params)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .map(([key, value]) => [key, String(value)])
+  ).toString() : '';
+  
+  const url = `/hours${queryParams ? `?${queryParams}` : ''}`;
+  const response = await api.get(url);
+  return response.data;
+};
+
+export const getHourById = async (id: string) => {
+  const response = await api.get(`/hours/${id}`);
+  return response.data.hour;
+};
+
+export const addHour = async (hourData: Partial<Hour>) => {
+  const response = await api.post('/hours', hourData);
+  return response.data;
+};
+
+export const updateHour = async (id: string, hourData: Partial<Hour>) => {
+  const response = await api.put(`/hours/${id}`, hourData);
+  return response.data;
+};
+
+export const deleteHour = async (id: string) => {
+  const response = await api.delete(`/hours/${id}`);
+  return response.data;
+};
+
+export const getHourStats = async (params?: Record<string, string | number | boolean | undefined>) => {
+  const queryParams = params ? new URLSearchParams(
+    Object.entries(params)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .map(([key, value]) => [key, String(value)])
+  ).toString() : '';
+  
+  const url = `/hours/stats${queryParams ? `?${queryParams}` : ''}`;
+  const response = await api.get(url);
+  return response.data.stats;
+};
+
+export const getChapterStatus = async (params?: Record<string, string | number | boolean | undefined>) => {
+  const queryParams = params ? new URLSearchParams(
+    Object.entries(params)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .map(([key, value]) => [key, String(value)])
+  ).toString() : '';
+  
+  const url = `/hours/chapter-status${queryParams ? `?${queryParams}` : ''}`;
+  const response = await api.get(url);
+  return response.data.chapters;
+};
+
+export const getHourOptions = async () => {
+  const response = await api.get('/hours/options');
+  return response.data.options;
+};

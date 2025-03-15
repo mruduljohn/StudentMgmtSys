@@ -16,6 +16,18 @@ const BooleanWithEmptyStringSupport = {
   }
 };
 
+// Custom enum type with empty string support
+const createEnumWithEmptySupport = (values: string[], defaultValue: string) => ({
+  type: String,
+  enum: [...values, ''],
+  set: (v: any) => {
+    if (v === undefined || v === null || v === '') {
+      return defaultValue;
+    }
+    return v;
+  }
+});
+
 const studentSchema = new mongoose.Schema(
   {
     slNo: { type: Number },
@@ -28,25 +40,26 @@ const studentSchema = new mongoose.Schema(
     hostel: { type: String },
     stream: { type: String },
     program: { type: String },
-    studyMaterial: { 
-      type: String, 
-      enum: ["NOT RECEIVED", "RECEIVED", "PARTIALLY RECEIVED"] 
-    },
-    uniform: { 
-      type: String, 
-      enum: ["NOT RECEIVED", "RECEIVED", "PARTIALLY RECEIVED"] 
-    },
-    idCard: { 
-      type: String, 
-      enum: ["NOT RECEIVED", "RECEIVED"] 
-    },
-    tab: { 
-      type: String, 
-      enum: ["REQUESTED NOT PAID", "RECEIVED PAID", "RECEIVED NOT PAID", "REQUESTED PAID", "PERSONAL TAB", "NOT REQUIRED"] 
-    },
+    studyMaterial: createEnumWithEmptySupport(
+      ["NOT RECEIVED", "RECEIVED", "PARTIALLY RECEIVED"],
+      "NOT RECEIVED"
+    ),
+    uniform: createEnumWithEmptySupport(
+      ["NOT RECEIVED", "RECEIVED", "PARTIALLY RECEIVED"],
+      "NOT RECEIVED"
+    ),
+    idCard: createEnumWithEmptySupport(
+      ["NOT RECEIVED", "RECEIVED"],
+      "NOT RECEIVED"
+    ),
+    tab: createEnumWithEmptySupport(
+      ["REQUESTED NOT PAID", "RECEIVED PAID", "RECEIVED NOT PAID", "REQUESTED PAID", "PERSONAL TAB", "NOT REQUIRED"],
+      "NOT REQUIRED"
+    ),
     joined: { 
       type: String, 
-      enum: ["ALLOTED", "DISCONTINUED", "JOINED", "NOT JOINING", "CENTRE CHANGE"] 
+      enum: ["ALLOTED", "DISCONTINUED", "JOINED", "NOT JOINING", "CENTRE CHANGE"],
+      default: "ALLOTED"
     },
     syllabus: { type: String },
     percentageOfPlus2Marks: { type: Number },

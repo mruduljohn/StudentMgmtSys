@@ -11,7 +11,8 @@ import {
   History,
   UserPlus,
   Menu,
-  X
+  X,
+  Clock
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -59,6 +60,11 @@ const Sidebar: React.FC = () => {
             <NavLink to="/analytics" className={linkClass}>
               <BarChart2 className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
               {!isCollapsed && <span className="ml-3">Analytics</span>}
+            </NavLink>
+            
+            <NavLink to="/hours" className={linkClass}>
+              <Clock className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
+              {!isCollapsed && <span className="ml-3">Hour Dashboard</span>}
             </NavLink>
             
             {isAdmin && (
@@ -162,6 +168,15 @@ const Sidebar: React.FC = () => {
             >
               <BarChart2 className="h-5 w-5 mr-3" />
               <span>Analytics</span>
+            </NavLink>
+            
+            <NavLink 
+              to="/hours" 
+              className="flex items-center px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-md"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <Clock className="h-5 w-5 mr-3" />
+              <span>Hour Dashboard</span>
             </NavLink>
             
             {isAdmin && (

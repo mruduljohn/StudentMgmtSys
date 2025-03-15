@@ -3,13 +3,15 @@ import React, { useState } from 'react';
 export interface FilterOption {
   id: string;
   label: string;
-  type: 'text' | 'select' | 'date' | 'boolean' | 'number';
+  type: 'text' | 'select' | 'date' | 'boolean' | 'number' | 'range';
   options?: { value: string; label: string }[];
   placeholder?: string;
+  min?: number;
+  max?: number;
 }
 
 export interface FilterValue {
-  [key: string]: string | boolean | number | null;
+  [key: string]: string | boolean | number | null | { min: number | null; max: number | null };
 }
 
 interface FilterPanelProps {
@@ -31,11 +33,24 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 }) => {
   const [filterValues, setFilterValues] = useState<FilterValue>(initialValues);
 
-  const handleInputChange = (id: string, value: string | boolean | number | null) => {
+  const handleInputChange = (id: string, value: string | boolean | number | null | { min: number | null; max: number | null }) => {
     setFilterValues((prev) => ({
       ...prev,
       [id]: value,
     }));
+  };
+
+  const handleRangeChange = (id: string, field: 'min' | 'max', value: number | null) => {
+    setFilterValues((prev) => {
+      const currentRange = prev[id] as { min: number | null; max: number | null } || { min: null, max: null };
+      return {
+        ...prev,
+        [id]: {
+          ...currentRange,
+          [field]: value,
+        },
+      };
+    });
   };
 
   const handleApplyFilters = () => {
@@ -90,6 +105,40 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
                           placeholder={filter.placeholder}
                           className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
                         />
+                      )}
+                      {filter.type === 'range' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label htmlFor={`${filter.id}-min`} className="block text-xs font-medium text-gray-500">
+                              Min
+                            </label>
+                            <input
+                              type="number"
+                              id={`${filter.id}-min`}
+                              value={((filterValues[filter.id] as { min: number | null; max: number | null })?.min) || ''}
+                              onChange={(e) => handleRangeChange(filter.id, 'min', e.target.value ? Number(e.target.value) : null)}
+                              placeholder="Min"
+                              min={filter.min}
+                              max={filter.max}
+                              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor={`${filter.id}-max`} className="block text-xs font-medium text-gray-500">
+                              Max
+                            </label>
+                            <input
+                              type="number"
+                              id={`${filter.id}-max`}
+                              value={((filterValues[filter.id] as { min: number | null; max: number | null })?.max) || ''}
+                              onChange={(e) => handleRangeChange(filter.id, 'max', e.target.value ? Number(e.target.value) : null)}
+                              placeholder="Max"
+                              min={filter.min}
+                              max={filter.max}
+                              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            />
+                          </div>
+                        </div>
                       )}
                       {filter.type === 'date' && (
                         <input

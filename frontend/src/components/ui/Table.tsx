@@ -208,7 +208,12 @@ function Table<T extends TableItem>({
               return (
                 <tr
                   key={`row-${rowIndex}`}
-                  onClick={onRowClick ? () => onRowClick(item) : undefined}
+                  onClick={(e) => {
+                    // Only trigger row click if not clicking on a checkbox
+                    if (onRowClick && !e.defaultPrevented) {
+                      onRowClick(item);
+                    }
+                  }}
                   className={`${onRowClick ? 'cursor-pointer' : ''} ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
                 >
                   {isSelectable && (
@@ -219,10 +224,15 @@ function Table<T extends TableItem>({
                           type="checkbox"
                           checked={item.select.checked}
                           onChange={(e) => {
-                            e.stopPropagation();
+                            e.preventDefault(); // Prevent the row click
+                            e.stopPropagation(); // Stop event propagation
                             if (item.select?.onChange) {
                               item.select.onChange(e.target.checked);
                             }
+                          }}
+                          onClick={(e) => {
+                            e.preventDefault(); // Prevent the row click
+                            e.stopPropagation(); // Stop event propagation
                           }}
                           className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />

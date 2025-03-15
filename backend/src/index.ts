@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth.routes";
 import studentRoutes from "./routes/student.routes";
 import configRoutes from "./routes/config.routes";
 import auditRoutes from "./routes/audit.routes";
+import hourRoutes from "./routes/hour.routes";
 import { setupSwagger } from "./swagger";
 import { ensureUploadsDir } from "./utils/ensureUploadsDir";
 
@@ -17,11 +18,12 @@ ensureUploadsDir();
 
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || '5000', 10);
 
 // CORS configuration
+const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000' || '*';
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: corsOrigin === '*' ? true : corsOrigin, // Allow any origin if set to '*'
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -39,6 +41,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api", studentRoutes);
 app.use("/api", configRoutes);
 app.use("/api", auditRoutes);
+app.use("/api", hourRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -50,8 +53,8 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // Start Server
-app.listen(PORT, async () => {
+app.listen(PORT, '0.0.0.0', async () => {
   await connectDB();
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
+  console.log(`🚀 Server is running on http://0.0.0.0:${PORT}`);
+  console.log(`📚 API Documentation available at http://0.0.0.0:${PORT}/api-docs`);
 });

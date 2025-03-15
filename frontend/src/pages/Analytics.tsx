@@ -338,170 +338,178 @@ const Analytics: React.FC = observer(() => {
       {/* Batch Summary Table */}
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-4">Batch Summary</h2>
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Batch
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Class Teacher
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Strength
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Study Material Due
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Uniform Due
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ID Card Due
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tab Due
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Fee Due
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {batchSummaries.map((summary) => (
-                <tr key={summary.batch}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {summary.batch}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {summary.classTeacher}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {summary.strength}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {summary.studyMaterialDue}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {summary.uniformDue}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {summary.idCardDue}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {summary.tabDue}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {summary.feeDue}
-                  </td>
-                </tr>
-              ))}
-              {/* Total row */}
-              <tr className="bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  Total
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  -
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  {batchSummaries.reduce((sum, summary) => sum + summary.strength, 0)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  {batchSummaries.reduce((sum, summary) => sum + summary.studyMaterialDue, 0)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  {batchSummaries.reduce((sum, summary) => sum + summary.uniformDue, 0)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  {batchSummaries.reduce((sum, summary) => sum + summary.idCardDue, 0)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  {batchSummaries.reduce((sum, summary) => sum + summary.tabDue, 0)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  {batchSummaries.reduce((sum, summary) => sum + summary.feeDue, 0)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="max-h-[70vh] overflow-y-auto relative">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0 z-10" style={{ position: 'sticky', top: 0 }}>
+                  <tr>
+                    <th className="sticky left-0 z-20 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Batch
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Class Teacher
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Strength
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Study Material Due
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Uniform Due
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      ID Card Due
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tab Due
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fee Due
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {batchSummaries.map((summary) => (
+                    <tr key={summary.batch}>
+                      <td className="sticky left-0 z-10 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-white">
+                        {summary.batch}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {summary.classTeacher}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {summary.strength}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {summary.studyMaterialDue}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {summary.uniformDue}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {summary.idCardDue}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {summary.tabDue}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {summary.feeDue}
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Total row */}
+                  <tr className="bg-gray-50">
+                    <td className="sticky left-0 z-10 px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 bg-gray-50">
+                      Total
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      -
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {batchSummaries.reduce((sum, summary) => sum + summary.strength, 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {batchSummaries.reduce((sum, summary) => sum + summary.studyMaterialDue, 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {batchSummaries.reduce((sum, summary) => sum + summary.uniformDue, 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {batchSummaries.reduce((sum, summary) => sum + summary.idCardDue, 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {batchSummaries.reduce((sum, summary) => sum + summary.tabDue, 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {batchSummaries.reduce((sum, summary) => sum + summary.feeDue, 0)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       
       {/* Hostel Summary Table */}
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-4">Hostel Allocation</h2>
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Hostel
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total Capacity
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Filled
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Vacancy
-                </th>
-                {/* Render batch columns - limit to 5 for space */}
-                {hostelSummaries.length > 0 && Object.keys(hostelSummaries[0].batches).slice(0, 5).map(batch => (
-                  <th key={batch} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {batch}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {hostelSummaries.map((summary) => (
-                <tr key={summary.hostel}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {summary.hostel}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {summary.totalCapacity || 'N/A'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {summary.filled}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {summary.totalCapacity ? summary.vacancy : 'N/A'}
-                  </td>
-                  {/* Render batch counts - limit to 5 for space */}
-                  {Object.keys(summary.batches).slice(0, 5).map(batch => (
-                    <td key={batch} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {summary.batches[batch]}
-                    </td>
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="max-h-[70vh] overflow-y-auto relative">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0 z-10" style={{ position: 'sticky', top: 0 }}>
+                  <tr>
+                    <th className="sticky left-0 z-20 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Hostel
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Capacity
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Filled
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Vacancy
+                    </th>
+                    {/* Render all batch columns */}
+                    {hostelSummaries.length > 0 && Object.keys(hostelSummaries[0].batches).map(batch => (
+                      <th key={batch} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {batch}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {hostelSummaries.map((summary) => (
+                    <tr key={summary.hostel}>
+                      <td className="sticky left-0 z-10 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-white">
+                        {summary.hostel}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {summary.totalCapacity || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {summary.filled}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {summary.totalCapacity ? summary.vacancy : 'N/A'}
+                      </td>
+                      {/* Render all batch counts */}
+                      {Object.keys(summary.batches).map(batch => (
+                        <td key={batch} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {summary.batches[batch]}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-              {/* Total row */}
-              <tr className="bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  Total
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  {hostelSummaries.reduce((sum, summary) => sum + (summary.totalCapacity || 0), 0)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  {hostelSummaries.reduce((sum, summary) => sum + summary.filled, 0)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  {hostelSummaries.reduce((sum, summary) => sum + (summary.vacancy || 0), 0)}
-                </td>
-                {/* Total for each batch column */}
-                {hostelSummaries.length > 0 && Object.keys(hostelSummaries[0].batches).slice(0, 5).map(batch => (
-                  <td key={batch} className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                    {hostelSummaries.reduce((sum, summary) => sum + (summary.batches[batch] || 0), 0)}
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+                  {/* Total row */}
+                  <tr className="bg-gray-50">
+                    <td className="sticky left-0 z-10 px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 bg-gray-50">
+                      Total
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {hostelSummaries.reduce((sum, summary) => sum + (summary.totalCapacity || 0), 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {hostelSummaries.reduce((sum, summary) => sum + summary.filled, 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {hostelSummaries.reduce((sum, summary) => sum + (summary.vacancy || 0), 0)}
+                    </td>
+                    {/* Total for each batch column */}
+                    {hostelSummaries.length > 0 && Object.keys(hostelSummaries[0].batches).map(batch => (
+                      <td key={batch} className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        {hostelSummaries.reduce((sum, summary) => sum + (summary.batches[batch] || 0), 0)}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       

@@ -50,8 +50,9 @@ const AuditLogs: React.FC = observer(() => {
   const isAdmin = user?.role === 'ADMIN';
   
   const [logs, setLogs] = useState<AuditLogTableRow[]>([]);
-  const [rawLogs, setRawLogs] = useState<AuditLog[]>([]);
+  const [allLogs, setAllLogs] = useState<AuditLog[]>([]); // Store all logs for statistics
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true); // Separate loading state for stats
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
@@ -107,6 +108,35 @@ const AuditLogs: React.FC = observer(() => {
     };
   };
   
+  // Fetch all logs for statistics
+  const fetchAllLogsForStats = async () => {
+    setStatsLoading(true);
+    try {
+      // Use the same filters but with a large limit to get all logs
+      const params = {
+        limit: 1000, // Set a high limit to get all logs
+        action: filters.action,
+        entityType: filters.entityType,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+      };
+      
+      const response = await getAuditLogs(params);
+      
+      if (response && response.auditLogs && Array.isArray(response.auditLogs)) {
+        setAllLogs(response.auditLogs as AuditLog[]);
+      } else {
+        console.error('Invalid response format for stats:', response);
+        setAllLogs([]);
+      }
+    } catch (error) {
+      console.error('Error fetching all audit logs for stats:', error);
+      setAllLogs([]);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+  
   // Fetch logs on component mount and when dependencies change
   useEffect(() => {
     if (!isAdmin) return;
@@ -128,9 +158,7 @@ const AuditLogs: React.FC = observer(() => {
         // Add defensive checks to prevent errors
         if (response && response.auditLogs && Array.isArray(response.auditLogs)) {
           const apiLogs = response.auditLogs as AuditLog[];
-          setRawLogs(apiLogs);
-          
-          // Convert to safe table rows
+          // Update the logs state directly without using rawLogs
           const tableRows = apiLogs.map(convertToTableRow);
           setLogs(tableRows);
           
@@ -139,14 +167,12 @@ const AuditLogs: React.FC = observer(() => {
           setTotalLogs(response.pagination?.total || 0);
         } else {
           console.error('Invalid response format:', response);
-          setRawLogs([]);
           setLogs([]);
           setTotalPages(1);
           setTotalLogs(0);
         }
       } catch (error) {
         console.error('Error fetching audit logs:', error);
-        setRawLogs([]);
         setLogs([]);
         setTotalPages(1);
         setTotalLogs(0);
@@ -156,6 +182,7 @@ const AuditLogs: React.FC = observer(() => {
     };
     
     fetchLogs();
+    fetchAllLogsForStats(); // Fetch all logs for statistics
   }, [isAdmin, currentPage, pageSize, filters]);
   
   // Handle search
@@ -359,7 +386,7 @@ const AuditLogs: React.FC = observer(() => {
           <div>
             <p className="text-sm text-gray-500">User Actions</p>
             <p className="text-xl font-semibold">
-              {rawLogs.filter(log => log.entityType === 'USER').length}
+              {statsLoading ? '...' : allLogs.filter(log => log.entityType === 'USER').length}
             </p>
           </div>
         </div>
@@ -371,7 +398,7 @@ const AuditLogs: React.FC = observer(() => {
           <div>
             <p className="text-sm text-gray-500">Student Actions</p>
             <p className="text-xl font-semibold">
-              {rawLogs.filter(log => log.entityType === 'STUDENT').length}
+              {statsLoading ? '...' : allLogs.filter(log => log.entityType === 'STUDENT').length}
             </p>
           </div>
         </div>
@@ -383,7 +410,7 @@ const AuditLogs: React.FC = observer(() => {
           <div>
             <p className="text-sm text-gray-500">Config Actions</p>
             <p className="text-xl font-semibold">
-              {rawLogs.filter(log => log.entityType === 'CONFIG').length}
+              {statsLoading ? '...' : allLogs.filter(log => log.entityType === 'CONFIG').length}
             </p>
           </div>
         </div>

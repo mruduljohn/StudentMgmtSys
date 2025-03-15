@@ -161,78 +161,105 @@ class StudentStore {
 
   // Apply filters, sorting, and pagination to the allStudents array
   applyFiltersAndPagination = action(() => {
+    // Start with all students
     let filteredStudents = [...this.allStudents];
     
-    // Apply search query
-    const searchQuery = this.searchQuery.get();
-    if (searchQuery) {
-      const lowerCaseQuery = searchQuery.toLowerCase();
+    // Apply search query if present
+    if (this.searchQuery.get()) {
+      const query = this.searchQuery.get().toLowerCase();
       filteredStudents = filteredStudents.filter(student => {
+        // Search in common fields
         return (
-          student.name?.toLowerCase().includes(lowerCaseQuery) ||
-          student.studentId?.toLowerCase().includes(lowerCaseQuery) ||
-          student.phoneNumber?.toLowerCase().includes(lowerCaseQuery) ||
-          student.batch?.toLowerCase().includes(lowerCaseQuery) ||
-          student.stream?.toLowerCase().includes(lowerCaseQuery)
+          student.name.toLowerCase().includes(query) ||
+          student.studentId.toLowerCase().includes(query) ||
+          student.phoneNumber.toLowerCase().includes(query) ||
+          student.batch.toLowerCase().includes(query) ||
+          student.classTeacher.toLowerCase().includes(query) ||
+          student.hostel.toLowerCase().includes(query)
         );
       });
     }
     
-    // Apply filters
+    // Apply all filters
     this.filters.forEach((value, key) => {
       if (value !== null && value !== undefined && value !== '') {
         filteredStudents = filteredStudents.filter(student => {
           const studentValue = student[key as keyof Student];
           
-          // Handle special case for feeDue (0 means paid, anything else means not paid)
+          // Special handling for feeDue filter
           if (key === 'feeDue') {
+            // If value is '0', show only students with feeDue = 0 (Paid)
             if (value === '0') {
-              return studentValue === 0;
-            } else {
-              return typeof studentValue === 'number' && studentValue > 0;
+              return student.feeDue === 0;
+            }
+            // If value is '1', show only students with feeDue > 0 (Not Paid)
+            else if (value === '1') {
+              return student.feeDue > 0;
             }
           }
           
-          return studentValue === value;
+          // Handle different types of filters for other fields
+          if (typeof value === 'string') {
+            if (typeof studentValue === 'string') {
+              return studentValue.toLowerCase().includes(value.toLowerCase());
+            }
+            return String(studentValue).toLowerCase().includes(value.toLowerCase());
+          } else if (typeof value === 'number') {
+            return Number(studentValue) === value;
+          } else if (typeof value === 'boolean') {
+            // Convert studentValue to boolean for comparison
+            return Boolean(studentValue) === value;
+          }
+          
+          return false;
         });
       }
     });
     
     // Apply sorting
-    const sortField = this.sortField.get();
-    const sortOrder = this.sortOrder.get();
+    const field = this.sortField.get();
+    const order = this.sortOrder.get();
     
     filteredStudents.sort((a, b) => {
-      const aValue = a[sortField as keyof Student];
-      const bValue = b[sortField as keyof Student];
-      
-      if (aValue === bValue) return 0;
-      
-      if (aValue === null || aValue === undefined) return sortOrder === 'asc' ? -1 : 1;
-      if (bValue === null || bValue === undefined) return sortOrder === 'asc' ? 1 : -1;
+      const aValue = a[field as keyof Student];
+      const bValue = b[field as keyof Student];
       
       if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortOrder === 'asc' 
+        return order === 'asc' 
           ? aValue.localeCompare(bValue) 
           : bValue.localeCompare(aValue);
+      } else {
+        if (aValue < bValue) return order === 'asc' ? -1 : 1;
+        if (aValue > bValue) return order === 'asc' ? 1 : -1;
+        return 0;
       }
-      
-      return sortOrder === 'asc' 
-        ? (aValue < bValue ? -1 : 1) 
-        : (aValue < bValue ? 1 : -1);
     });
     
-    // Update total counts
-    this.totalStudents.set(filteredStudents.length);
-    this.totalPages.set(Math.ceil(filteredStudents.length / this.pageSize.get()));
+    // Use runInAction to batch updates and ensure proper notification
+    runInAction(() => {
+      // Update total counts based on filtered students
+      // These counts reflect the number of filtered students
+      this.totalStudents.set(filteredStudents.length);
+      this.totalPages.set(Math.ceil(filteredStudents.length / this.pageSize.get()) || 1);
+      
+      // Apply pagination
+      const startIndex = (this.currentPage.get() - 1) * this.pageSize.get();
+      const endIndex = startIndex + this.pageSize.get();
+      const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
+      
+      // THIS IS THE KEY FIX: Update the students array with the paginated filtered students
+      this.students.replace(paginatedStudents);
+      
+      // Force a notification to observers that the data has changed
+      this.students.splice(0, 0); // This is a no-op that forces MobX to notify observers
+    });
     
-    // Apply pagination
-    const startIndex = (this.currentPage.get() - 1) * this.pageSize.get();
-    const endIndex = startIndex + this.pageSize.get();
-    const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
+    console.log(`Applied filters: Found ${filteredStudents.length} students, showing ${this.students.length} on page ${this.currentPage.get()}`);
     
-    // Update students array
-    this.students.replace(paginatedStudents);
+    return {
+      filteredStudents,
+      paginatedStudents: [...this.students]
+    };
   });
 
   // Fetch all students at once
@@ -278,6 +305,25 @@ class StudentStore {
     this.loading.set(true);
     
     try {
+      // Check if we should use local filtering instead of API call
+      if (this.allStudents.length > 0) {
+        // Use local filtering and pagination
+        const result = this.applyFiltersAndPagination();
+        this.loading.set(false);
+        
+        console.log("Using local filtering instead of API call");
+        console.log(`Total students: ${this.totalStudents.get()}, Page: ${this.currentPage.get()} of ${this.totalPages.get()}`);
+        console.log(`Students data: ${result.paginatedStudents.length} records displayed out of ${result.filteredStudents.length} filtered records`);
+        
+        // Return a new object to ensure observers detect the change
+        return { 
+          students: [...this.students], 
+          totalItems: this.totalStudents.get(), 
+          totalPages: this.totalPages.get() 
+        };
+      }
+      
+      // If no local data, proceed with API call
       // Prepare API parameters
       const params: ApiParams = {
         page: this.currentPage.get(),
@@ -290,7 +336,13 @@ class StudentStore {
       // Add all filters to params
       this.filters.forEach((value, key) => {
         if (value !== null && value !== undefined && value !== '') {
-          params[key] = value;
+          // Special handling for feeDue filter for API calls
+          if (key === 'feeDue') {
+            // Convert '0' to 0 and '1' to 1 for the API
+            params[key] = value === '0' ? 0 : 1;
+          } else {
+            params[key] = value;
+          }
         }
       });
       
@@ -305,10 +357,17 @@ class StudentStore {
         this.totalStudents.set(response.totalItems || 0);
         this.totalPages.set(response.totalPages || 0);
         this.loading.set(false);
+        
+        // Force a notification to observers that the data has changed
+        this.students.splice(0, 0); // This is a no-op that forces MobX to notify observers
       });
       
+      console.log("API fetchStudents response:", response);
+      console.log(`Updated students array with ${this.students.length} items`);
+      
+      // Return a new object to ensure observers detect the change
       return { 
-        students: this.students, 
+        students: [...this.students], 
         totalItems: this.totalStudents.get(), 
         totalPages: this.totalPages.get() 
       };
@@ -644,12 +703,51 @@ class StudentStore {
     this.loading.set(true);
     
     try {
+      // If we have all students loaded, we can filter locally
+      if (this.allStudents.length > 0) {
+        console.log("Using local filtering for fetchAllFilteredStudents");
+        
+        // Create a temporary store to apply filters
+        const tempStore = new StudentStore();
+        tempStore.allStudents.replace(this.allStudents);
+        
+        // Apply search query if present
+        if (params.search) {
+          tempStore.setSearchQuery(params.search);
+        }
+        
+        // Apply all filters
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== null && value !== undefined && value !== '' && 
+              key !== 'page' && key !== 'limit' && key !== 'search' && 
+              key !== 'sortBy' && key !== 'sortOrder') {
+            tempStore.setFilter(key, value);
+          }
+        });
+        
+        // Apply sorting
+        if (params.sortBy && params.sortOrder) {
+          tempStore.setSorting(params.sortBy, params.sortOrder as 'asc' | 'desc');
+        }
+        
+        // Get all filtered students without pagination
+        const result = tempStore.applyFiltersAndPagination();
+        return result.filteredStudents;
+      }
+      
+      // If no local data, proceed with API call
       // Create a new params object with limit set to a large number to get all results
-      const allParams = {
+      const allParams: ApiParams = {
         ...params,
         page: 1,
         limit: 10000 // Set a large limit to get all students
       };
+      
+      // Special handling for feeDue filter for API calls
+      if ('feeDue' in allParams && allParams.feeDue !== undefined) {
+        // Type assertion to handle the dynamic property
+        (allParams as any).feeDue = allParams.feeDue === '0' ? 0 : 1;
+      }
       
       console.log("Fetching all filtered students with params:", allParams);
       

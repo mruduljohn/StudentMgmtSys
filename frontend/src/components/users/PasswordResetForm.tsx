@@ -55,8 +55,9 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
       setTimeout(() => {
         onClose();
       }, 2000);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to reset password');
+    } catch (err: unknown) {
+      const apiError = err as { response?: { data?: { message?: string } } };
+      setError(apiError.response?.data?.message || 'Failed to reset password');
     } finally {
       setIsSubmitting(false);
     }

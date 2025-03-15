@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
-import axios from 'axios';
+import api from '../api'; // Import the default export from api.ts
 
 const Register = () => {
   const navigate = useNavigate();
@@ -18,7 +18,7 @@ const Register = () => {
 
     try {
       // Don't hash password on client side, let the server handle it
-      const response = await axios.post('http://localhost:5000/api/auth/register', {
+      const response = await api.post('/auth/register', {
         username,
         password,
         email,
