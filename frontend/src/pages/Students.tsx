@@ -707,15 +707,15 @@ const Students: React.FC = observer(() => {
               Export Selected ({selectedRows.length})
             </Button>
             
-            <Button
-              variant="secondary"
-              size="sm"
+          <Button
+            variant="secondary"
+            size="sm"
               onClick={handleBulkEdit}
               disabled={!hasSelected}
             >
               <Edit size={16} className="mr-1" />
               Edit ({selectedRows.length})
-            </Button>
+          </Button>
             
             <Button
               variant="danger"
@@ -727,8 +727,8 @@ const Students: React.FC = observer(() => {
               Delete ({selectedRows.length})
             </Button>
           </>
-        )}
-      </div>
+          )}
+        </div>
     );
   };
 

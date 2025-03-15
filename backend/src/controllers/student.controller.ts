@@ -494,6 +494,17 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
       return;
     }
     
+    // Get the mode from query parameters (new, update, or combined)
+    const mode = req.query.mode as string || 'combined';
+    
+    // Based on the mode, call the appropriate controller
+    if (mode === 'new') {
+      return await uploadNewStudentsCSV(req, res);
+    } else if (mode === 'update') {
+      return await uploadUpdateStudentsCSV(req, res);
+    }
+    
+    // Default behavior (combined mode) continues below
     const filePath = req.file.path;
     const results: any[] = [];
     const errors: any[] = [];

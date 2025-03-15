@@ -380,9 +380,9 @@ const UserManagement: React.FC = () => {
               name="class"
               value={formData.class}
               onChange={handleInputChange}
-              options={batchConfig.teachers.map(teacher => ({
-                value: teacher,
-                label: teacher
+              options={batchConfig.batches.map(batch => ({
+                value: batch,
+                label: batch
               }))}
               fullWidth
             />
@@ -449,9 +449,9 @@ const UserManagement: React.FC = () => {
               name="class"
               value={formData.class}
               onChange={handleInputChange}
-              options={batchConfig.teachers.map(teacher => ({
-                value: teacher,
-                label: teacher
+              options={batchConfig.batches.map(batch => ({
+                value: batch,
+                label: batch
               }))}
               fullWidth
             />

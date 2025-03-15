@@ -179,10 +179,14 @@ export const uploadNewStudentsCSV = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await api.post('/upload-new-csv', formData, {
+  // Use the same endpoint as the combined upload but with a different controller
+  const response = await api.post('/students/upload/csv', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    params: {
+      mode: 'new'
+    }
   });
   
   return response.data;
@@ -192,10 +196,14 @@ export const uploadUpdateStudentsCSV = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await api.post('/upload-update-csv', formData, {
+  // Use the same endpoint as the combined upload but with a different controller
+  const response = await api.post('/students/upload/csv', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    params: {
+      mode: 'update'
+    }
   });
   
   return response.data;
