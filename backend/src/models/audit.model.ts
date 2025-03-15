@@ -15,7 +15,7 @@ const auditSchema = new mongoose.Schema(
     entityType: {
       type: String,
       required: true,
-      enum: ["STUDENT", "USER", "CONFIG", "SYSTEM"]
+      enum: ["STUDENT", "USER", "CONFIG", "SYSTEM","HOUR"]
     },
     entityId: {
       type: mongoose.Schema.Types.ObjectId,

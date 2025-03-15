@@ -1,0 +1,3 @@
+@echo off
+echo Stopping and removing existing containers...
+docker compose down

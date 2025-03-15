@@ -92,60 +92,36 @@ const Students: React.FC = observer(() => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [deleteAction, setDeleteAction] = useState<'single' | 'bulk'>('single');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [studentsWithPaymentStatus, setStudentsWithPaymentStatus] = useState<ExtendedStudent[]>([]);
+  // Add a state variable to track pagination changes
+  const [paginationKey, setPaginationKey] = useState(0);
+  // Add a state variable to track filter changes
+  const [filterKey, setFilterKey] = useState(0);
   
-  // Initialize store on component mount
-  useEffect(() => {
-    const initializeStore = async () => {
-      try {
-        if (!studentStore.isDataLoaded) {
-        await studentStore.init();
-        }
-        setStoreInitialized(true);
-      } catch (error) {
-        console.error("Failed to initialize student store:", error);
-      }
-    };
-    
-    initializeStore();
-  }, [studentStore]);
+  // Create a custom name cell with a hyperlink - Define this function before it's used in useEffect
+  const getNameCell = (student: ExtendedStudent) => (
+    <a 
+      href="#" 
+      className="text-blue-600 hover:text-blue-800 hover:underline"
+      onClick={(e) => {
+        e.preventDefault();
+        handleEdit(student);
+      }}
+    >
+      {student.name}
+    </a>
+  );
   
-  // Apply filters and pagination when dependencies change
-  useEffect(() => {
-    if (storeInitialized) {
-      // Just apply filters and pagination, don't fetch from API again
-      studentStore.applyFiltersAndPagination();
+  // Define handleRowSelect before it's used in useEffect
+  const handleRowSelect = (id: string, selected: boolean) => {
+    if (selected) {
+      setSelectedRows(prev => [...prev, id]);
+    } else {
+      setSelectedRows(prev => prev.filter(rowId => rowId !== id));
     }
-  }, [
-    storeInitialized,studentStore
-    // Remove dependencies on studentStore properties
-    // studentStore.getCurrentPage,
-    // studentStore.getPageSize,
-    // studentStore.getSortField,
-    // studentStore.getSortOrder
-  ]);
+  };
   
-  // Only render content when store is initialized
-  if (!storeInitialized) {
-    return (
-      <Layout>
-        <div className="p-4 text-center">
-          <div className="text-lg">Loading student data...</div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Show loading indicator when fetching data
-  if (studentStore.isLoading && studentStore.getStudents.length === 0) {
-    return (
-      <Layout>
-        <div className="p-4 text-center">
-          <div className="text-lg">Loading student data...</div>
-        </div>
-      </Layout>
-    );
-  }
-  
+  // Define handleEdit function early
   const handleEdit = (student: ExtendedStudent) => {
     // For mentors, only allow editing students they are assigned to
     if (!isAdmin) {
@@ -204,6 +180,143 @@ const Students: React.FC = observer(() => {
     setIsPasswordModalOpen(true);
   };
   
+  // Add a custom cell for actions - Define this function before it's used in useEffect
+  const getActionButtons = (student: ExtendedStudent) => {
+    // For mentors, disable edit button for students they're not assigned to
+    let canEdit = isAdmin;
+    
+    if (!isAdmin) {
+      // The username is already in the correct format (e.g., "SIJO.JAMES")
+      // The class teacher name in the student record is in display format (e.g., "Sijo James")
+      // We need to convert the class teacher name to username format for comparison
+      
+      const classTeacherAsUsername = student.classTeacher
+        .toUpperCase()
+        .replace(/\s+/g, '.');
+      
+      canEdit = classTeacherAsUsername === user?.username;
+    }
+    
+    return (
+        <div className="flex space-x-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEdit(student);
+            }}
+          disabled={!canEdit}
+          title={!canEdit ? "You can only edit students assigned to you" : "Edit student"}
+          >
+            <Edit size={16} />
+          </Button>
+          {isAdmin && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(student);
+              }}
+            >
+              <Trash2 size={16} />
+            </Button>
+          )}
+        </div>
+    );
+  };
+  
+  // Initialize store on component mount
+  useEffect(() => {
+    const initializeStore = async () => {
+      try {
+        if (!studentStore.isDataLoaded) {
+        await studentStore.init();
+        }
+        setStoreInitialized(true);
+      } catch (error) {
+        console.error("Failed to initialize student store:", error);
+      }
+    };
+    
+    initializeStore();
+  }, [studentStore]);
+  
+  // Apply filters and pagination when dependencies change
+  useEffect(() => {
+    if (storeInitialized) {
+      // Just apply filters and pagination, don't fetch from API again
+      studentStore.applyFiltersAndPagination();
+    }
+  }, [
+    storeInitialized,
+    studentStore,
+    studentStore.getCurrentPage,
+    studentStore.getPageSize,
+    studentStore.getSortField,
+    studentStore.getSortOrder
+  ]);
+  
+  // Effect to fetch students when the component mounts
+  useEffect(() => {
+    if (storeInitialized) {
+      // Update the studentsWithPaymentStatus array when the students array changes
+      const students = studentStore.getStudents;
+      console.log(`Updating studentsWithPaymentStatus with ${students.length} students`);
+      
+      const updatedStudents = students.map((student, index) => {
+        // Create a new student object with the select property
+        const extendedStudent: ExtendedStudent = {
+          ...student,
+          slNo: index + 1, // Update the serial number
+          name: getNameCell({ ...student, slNo: index + 1 } as ExtendedStudent),
+          actions: getActionButtons({ ...student, slNo: index + 1 } as ExtendedStudent),
+          select: {
+            type: 'checkbox',
+            checked: selectedRows.includes(student.studentId),
+            onChange: (checked) => handleRowSelect(student.studentId, checked)
+          }
+        };
+        return extendedStudent;
+      });
+      
+      setStudentsWithPaymentStatus(updatedStudents);
+    }
+  }, [
+    storeInitialized, 
+    studentStore.getStudents, 
+    selectedRows, 
+    paginationKey,
+    filterKey,
+    studentStore.getCurrentPage,
+    studentStore.getPageSize,
+    studentStore.getSortField,
+    studentStore.getSortOrder
+  ]);
+  
+  // Only render content when store is initialized
+  if (!storeInitialized) {
+    return (
+      <Layout>
+        <div className="p-4 text-center">
+          <div className="text-lg">Loading student data...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Show loading indicator when fetching data
+  if (studentStore.isLoading && studentStore.getStudents.length === 0) {
+    return (
+      <Layout>
+        <div className="p-4 text-center">
+          <div className="text-lg">Loading student data...</div>
+        </div>
+      </Layout>
+    );
+  }
+  
   const confirmDelete = async () => {
     if (selectedStudent) {
       try {
@@ -228,13 +341,13 @@ const Students: React.FC = observer(() => {
   const confirmBulkDelete = async () => {
     try {
       console.log(`Bulk deleting ${selectedRows.length} students`);
-      // Use Promise.all to wait for all delete operations to complete
-      await Promise.all(selectedRows.map(id => studentStore.deleteStudent(id)));
-      setSelectedRows([]);
+        // Use Promise.all to wait for all delete operations to complete
+        await Promise.all(selectedRows.map(id => studentStore.deleteStudent(id)));
+        setSelectedRows([]);
       // No need to call fetchStudents since the store already updates
-    } catch (error) {
-      console.error("Error deleting students:", error);
-      alert("Failed to delete some students. Please try again.");
+      } catch (error) {
+        console.error("Error deleting students:", error);
+        alert("Failed to delete some students. Please try again.");
     }
   };
   
@@ -253,14 +366,6 @@ const Students: React.FC = observer(() => {
     }
   };
   
-  const handleRowSelect = (id: string, selected: boolean) => {
-    if (selected) {
-      setSelectedRows(prev => [...prev, id]);
-    } else {
-      setSelectedRows(prev => prev.filter(rowId => rowId !== id));
-    }
-  };
-  
   const handleApplyFilters = (filters: FilterValue) => {
     // Clear existing filters first
     studentStore.clearFilters();
@@ -268,12 +373,26 @@ const Students: React.FC = observer(() => {
     // Apply each filter individually
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== null && value !== '') {
-        studentStore.setFilter(key, value);
+        if (typeof value === 'object' && value !== null && 'min' in value && 'max' in value) {
+          // Handle range filters
+          const rangeValue = value as { min: number | null; max: number | null };
+          if (rangeValue.min !== null) {
+            studentStore.setFilter(`${key}Min`, rangeValue.min);
+          }
+          if (rangeValue.max !== null) {
+            studentStore.setFilter(`${key}Max`, rangeValue.max);
+          }
+        } else {
+          // Handle regular filters
+          studentStore.setFilter(key, value as string | number | boolean);
+        }
       }
     });
     
-    // Fetch students with the new filters
-    studentStore.fetchStudents();
+    // Increment filterKey to force a re-render
+    setFilterKey(prev => prev + 1);
+    
+    // No need to call fetchStudents() as applyFiltersAndPagination is already called by setFilter
   };
   
   const handleSearch = (query: string, fields: Record<string, string>) => {
@@ -293,8 +412,10 @@ const Students: React.FC = observer(() => {
     // Set the filters in the store
     studentStore.setFilters(searchFilters);
     
-    // Fetch students with the new search parameters
-    studentStore.fetchStudents();
+    // Increment filterKey to force a re-render
+    setFilterKey(prev => prev + 1);
+    
+    // No need to call fetchStudents() as applyFiltersAndPagination is already called by setSearchQuery and setFilters
   };
   
   // Define search fields
@@ -409,6 +530,20 @@ const Students: React.FC = observer(() => {
       options: batchConfig.programs.map((program: string) => ({ value: program, label: program })),
     },
     {
+      id: 'neetScore',
+      label: 'NEET Score',
+      type: 'range',
+      min: 0,
+      max: 720,
+    },
+    {
+      id: 'percentageOfPlus2Marks',
+      label: 'Plus 2 Percentage',
+      type: 'range',
+      min: 0,
+      max: 100,
+    },
+    {
       id: 'joined',
       label: 'Status',
       type: 'select',
@@ -484,87 +619,6 @@ const Students: React.FC = observer(() => {
     { id: 'actions', label: 'Actions', width: '150px' }
   ];
   
-  // Add a custom cell for actions
-  const getActionButtons = (student: ExtendedStudent) => {
-    // For mentors, disable edit button for students they're not assigned to
-    let canEdit = isAdmin;
-    
-    if (!isAdmin) {
-      // The username is already in the correct format (e.g., "SIJO.JAMES")
-      // The class teacher name in the student record is in display format (e.g., "Sijo James")
-      // We need to convert the class teacher name to username format for comparison
-      
-      const classTeacherAsUsername = student.classTeacher
-        .toUpperCase()
-        .replace(/\s+/g, '.');
-      
-      canEdit = classTeacherAsUsername === user?.username;
-    }
-    
-    return (
-        <div className="flex space-x-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEdit(student);
-            }}
-          disabled={!canEdit}
-          title={!canEdit ? "You can only edit students assigned to you" : "Edit student"}
-          >
-            <Edit size={16} />
-          </Button>
-          {isAdmin && (
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(student);
-              }}
-            >
-              <Trash2 size={16} />
-            </Button>
-          )}
-        </div>
-    );
-  };
-
-  // Create a custom name cell with a hyperlink
-  const getNameCell = (student: ExtendedStudent) => (
-    <a 
-      href="#" 
-      className="text-blue-600 hover:text-blue-800 hover:underline"
-      onClick={(e) => {
-        e.preventDefault();
-        handleEdit(student);
-      }}
-    >
-      {student.name}
-    </a>
-  );
-
-  // Modify the studentsWithPaymentStatus to include select property for checkboxes
-  const studentsWithPaymentStatus = studentStore.getStudents.map(student => {
-    const isSelected = selectedRows.includes(student.studentId);
-    const studentData = {
-      ...student,
-      hasPaid: student.feeDue === 0,
-      // Add select property for checkboxes
-      select: isAdmin ? {
-        type: 'checkbox' as const,
-        checked: isSelected,
-        onChange: (checked: boolean) => handleRowSelect(student.studentId, checked)
-      } : undefined,
-      // Add actions
-      actions: getActionButtons(student as ExtendedStudent),
-      // Replace name with a hyperlink
-      name: getNameCell(student as ExtendedStudent)
-    };
-    return studentData as ExtendedStudent;
-  });
-
   // Add console log to debug
   console.log("Students data:", studentsWithPaymentStatus);
 
@@ -716,9 +770,9 @@ const Students: React.FC = observer(() => {
     <Layout>
       <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Students</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Students</h1>
           <p className="text-gray-600">
-            {studentStore.getTotalStudents} students found
+            {studentStore.getTotalStudents > 0 ? `${studentStore.getTotalStudents} students found` : "No students found"}
           </p>
         </div>
         
@@ -756,6 +810,8 @@ const Students: React.FC = observer(() => {
             onApplyFilters={handleApplyFilters}
             onResetFilters={() => {
               studentStore.clearFilters();
+              // Increment filterKey to force a re-render
+              setFilterKey(prev => prev + 1);
               studentStore.fetchStudents();
             }}
             isOpen={isFilterOpen}
@@ -770,8 +826,8 @@ const Students: React.FC = observer(() => {
           searchFields={searchFields}
           onSearch={handleSearch}
           initialQuery=""
-        />
-      </div>
+            />
+          </div>
       
       {studentStore.isLoading ? (
         <div className="flex justify-center items-center h-64">
@@ -787,9 +843,9 @@ const Students: React.FC = observer(() => {
               priorityFields={['name', 'studentId', 'batch', 'classTeacher']}
             />
           ) : (
-            <Table
-              columns={columns}
-              data={studentsWithPaymentStatus}
+        <Table
+          columns={columns}
+          data={studentsWithPaymentStatus}
               onRowClick={(student) => handleEdit(student as ExtendedStudent)}
               isSelectable={isAdmin}
               sortField={studentStore.getSortField}
@@ -803,22 +859,28 @@ const Students: React.FC = observer(() => {
               Showing {studentsWithPaymentStatus.length} of {studentStore.getTotalStudents} students
             </div>
             
-            <Pagination
-              currentPage={studentStore.getCurrentPage}
-              totalPages={studentStore.getTotalPages}
-              onPageChange={(page) => {
-                studentStore.setPage(page);
-                studentStore.fetchStudents();
-              }}
-              pageSize={studentStore.getPageSize}
-              totalItems={studentStore.getTotalStudents}
-              onPageSizeChange={(size) => {
-                studentStore.setPageSize(size);
-                studentStore.fetchStudents();
-              }}
-              pageSizeOptions={[10, 25, 50, 100]}
-            />
-          </div>
+          <Pagination
+            currentPage={studentStore.getCurrentPage}
+            totalPages={studentStore.getTotalPages}
+            onPageChange={(page) => {
+              studentStore.setPage(page);
+              // Explicitly call fetchStudents to update the data
+              studentStore.fetchStudents();
+              // Increment paginationKey to force a re-render
+              setPaginationKey(prev => prev + 1);
+            }}
+            pageSize={studentStore.getPageSize}
+            totalItems={studentStore.getTotalStudents}
+            onPageSizeChange={(size) => {
+              studentStore.setPageSize(size);
+              // Explicitly call fetchStudents to update the data
+              studentStore.fetchStudents();
+              // Increment paginationKey to force a re-render
+              setPaginationKey(prev => prev + 1);
+            }}
+            pageSizeOptions={[50, 100, 200, 500]}
+          />
+        </div>
         </>
       )}
       

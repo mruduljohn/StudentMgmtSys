@@ -10,6 +10,7 @@ import Settings from './pages/Settings';
 import AuditLogs from './pages/AuditLogs';
 import Analytics from './pages/Analytics';
 import UserManagement from './pages/UserManagement';
+import HourDashboard from './pages/HourDashboard';
 
 // Stores
 import { useAuthStore } from './store/authStore';
@@ -73,6 +74,7 @@ function App() {
         <Route path="/audit-logs" element={<ProtectedRoute element={<AuditLogs />} adminOnly />} />
         <Route path="/analytics" element={<ProtectedRoute element={<Analytics />} />} />
         <Route path="/users" element={<ProtectedRoute element={<UserManagement />} adminOnly />} />
+        <Route path="/hours" element={<ProtectedRoute element={<HourDashboard />} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

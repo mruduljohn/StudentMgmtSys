@@ -66,6 +66,14 @@ export const getAllStudents = async (req: Request, res: Response): Promise<void>
       filter.neetScore = { ...filter.neetScore, $lte: parseInt(req.query.maxNeetScore as string) };
     }
     
+    // Handle new range filter parameters
+    if (req.query.neetScoreMin) {
+      filter.neetScore = { $gte: parseInt(req.query.neetScoreMin as string) };
+    }
+    if (req.query.neetScoreMax) {
+      filter.neetScore = { ...filter.neetScore, $lte: parseInt(req.query.neetScoreMax as string) };
+    }
+    
     if (req.query.minPercentage) {
       filter.percentageOfPlus2Marks = { $gte: parseInt(req.query.minPercentage as string) };
     }
@@ -73,6 +81,17 @@ export const getAllStudents = async (req: Request, res: Response): Promise<void>
       filter.percentageOfPlus2Marks = { 
         ...filter.percentageOfPlus2Marks, 
         $lte: parseInt(req.query.maxPercentage as string) 
+      };
+    }
+    
+    // Handle new percentage range filter parameters
+    if (req.query.percentageOfPlus2MarksMin) {
+      filter.percentageOfPlus2Marks = { $gte: parseInt(req.query.percentageOfPlus2MarksMin as string) };
+    }
+    if (req.query.percentageOfPlus2MarksMax) {
+      filter.percentageOfPlus2Marks = { 
+        ...filter.percentageOfPlus2Marks, 
+        $lte: parseInt(req.query.percentageOfPlus2MarksMax as string) 
       };
     }
     
@@ -169,6 +188,27 @@ export const addStudent = async (req: Request, res: Response): Promise<void> => 
       return;
     }
     
+    // Set default values for enum fields if they are empty
+    if (!studentData.studyMaterial) {
+      studentData.studyMaterial = "NOT RECEIVED";
+    }
+    
+    if (!studentData.uniform) {
+      studentData.uniform = "NOT RECEIVED";
+    }
+    
+    if (!studentData.idCard) {
+      studentData.idCard = "NOT RECEIVED";
+    }
+    
+    if (!studentData.tab) {
+      studentData.tab = "NOT REQUIRED";
+    }
+    
+    if (!studentData.joined) {
+      studentData.joined = "ALLOTED";
+    }
+    
     // Create new student
     const student = await Student.create(studentData);
     
@@ -176,7 +216,7 @@ export const addStudent = async (req: Request, res: Response): Promise<void> => 
     if (req.user?.role === "MENTOR") {
       // Ensure the classTeacher is set to the mentor's name
       student.classTeacher = req.user.name;
-  await student.save();
+      await student.save();
       
       // Add student to mentor's assigned students
       await User.findByIdAndUpdate(req.user.id, {
@@ -227,6 +267,30 @@ export const updateStudent = async (req: Request, res: Response): Promise<void> 
         return;
       }
     }
+    
+    // Set default values for enum fields if they are empty
+    if (updateData.studyMaterial === '') {
+      updateData.studyMaterial = "NOT RECEIVED";
+    }
+    
+    if (updateData.uniform === '') {
+      updateData.uniform = "NOT RECEIVED";
+    }
+    
+    if (updateData.idCard === '') {
+      updateData.idCard = "NOT RECEIVED";
+    }
+    
+    if (updateData.tab === '') {
+      updateData.tab = "NOT REQUIRED";
+    }
+    
+    if (updateData.joined === '') {
+      updateData.joined = "ALLOTED";
+    }
+    
+    // Store old data for audit
+    const oldData = student.toObject();
     
     // Track if class teacher is changing
     const oldClassTeacher = student.classTeacher;

@@ -40,13 +40,105 @@ export interface Student {
   flag4: string;
 }
 
+export interface Faculty {
+  code?: string;
+  name?: string;
+}
+
+export interface Hour {
+  _id?: string;
+  id?: string;
+  batch: string;
+  subject: string;
+  chapter: string;
+  mode: string;
+  faculties?: Faculty[];
+  // Legacy faculty fields for backward compatibility
+  faculty1?: Faculty | string;
+  faculty2?: Faculty | string;
+  faculty3?: Faculty | string;
+  examDate?: Date | string;
+  allotedHours: number;
+  completedHours: number;
+  remainingHoursNeeded?: number;
+  classTeacher: string;
+  chapterStatus: 'NOT STARTED' | 'ONGOING' | 'COMPLETED';
+  averageMarksOfBatch?: number;
+  numberOfAPlus?: number;
+  remarks1?: string;
+  remarks2?: string;
+  remarks3?: string;
+  flag1?: string;
+  flag2?: string;
+  remainingHours?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string | User;
+  updatedBy?: string | User;
+}
+
+export interface HourStats {
+  subjectStats: Array<{
+    subject: string;
+    totalAllotedHours: number;
+    totalCompletedHours: number;
+    totalRemainingHours: number;
+    completionPercentage: number;
+  }>;
+  batchStats: Array<{
+    batch: string;
+    subject: string;
+    totalAllotedHours: number;
+    totalCompletedHours: number;
+    totalRemainingHours: number;
+    completedChapters: number;
+    ongoingChapters: number;
+    notStartedChapters: number;
+    totalChapters: number;
+    completionPercentage: number;
+  }>;
+  chapterStatusStats: Array<{
+    status: string;
+    count: number;
+  }>;
+  overallStats: {
+    totalAllotedHours: number;
+    totalCompletedHours: number;
+    totalRemainingHours: number;
+    totalEntries: number;
+    averageMarks: number;
+    totalAPlus: number;
+    completionPercentage: number;
+  };
+  // Additional properties for charts
+  hoursByMonth: Array<{
+    month: string;
+    totalHours: number;
+  }>;
+  hoursByMode: Array<{
+    mode: string;
+    totalHours: number;
+  }>;
+  hoursBySubject: Array<{
+    subject: string;
+    totalHours: number;
+  }>;
+  hoursByStatus: Array<{
+    status: string;
+    totalHours: number;
+  }>;
+  totalHours: number;
+  totalChapters: number;
+  completionRate: number;
+}
+
 export interface FieldConfig {
   id: string;
   label: string;
   type: 'text' | 'number' | 'select';
   options?: string[];
   editable: boolean; // Whether mentors can edit this field
-  validation?: (value: any) => boolean;
+  validation?: (value: string | number) => boolean;
   errorMessage?: string;
 }
 
