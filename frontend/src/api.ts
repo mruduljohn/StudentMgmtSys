@@ -366,3 +366,36 @@ export const getHourOptions = async () => {
   const response = await api.get('/hours/options');
   return response.data.options;
 };
+
+// Get subject chapters
+export const getSubjectChapters = async () => {
+  try {
+    const response = await api.get('/config/subject-chapters');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching subject chapters:', error);
+    throw error;
+  }
+};
+
+// Update chapters for a specific subject
+export const updateSubjectChapters = async (subject: string, chapters: string[]) => {
+  try {
+    const response = await api.put(`/config/subject-chapters/${subject}`, { chapters });
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating chapters for ${subject}:`, error);
+    throw error;
+  }
+};
+
+// Initialize default subject chapters
+export const initializeDefaultSubjectChapters = async () => {
+  try {
+    const response = await api.post('/config/subject-chapters/initialize');
+    return response.data;
+  } catch (error) {
+    console.error('Error initializing default subject chapters:', error);
+    throw error;
+  }
+};

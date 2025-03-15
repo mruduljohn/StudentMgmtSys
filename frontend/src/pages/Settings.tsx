@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Save} from 'lucide-react';
-// import { RefreshCw } from 'lucide-react';
+import { Save } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Input from '../components/ui/Input';
 import TextArea from '../components/ui/TextArea';
 import Button from '../components/ui/Button';
+import Select from '../components/ui/Select';
 import { useStudentStore } from '../store/studentStore';
 import { BatchConfig, RemarksConfig, FlagsConfig } from '../types';
-// import { initializeDefaultConfigs } from '../api';
+import { 
+  getSubjectChapters, 
+  updateSubjectChapters, 
+  initializeDefaultSubjectChapters
+} from '../api';
+import { toast, Toaster } from 'react-hot-toast';
 
 const Settings: React.FC = () => {
   const { 
@@ -16,17 +21,20 @@ const Settings: React.FC = () => {
     flagsConfig,
     updateBatchConfig,
     updateRemarksConfig,
-    updateFlagsConfig,
-    isLoading,
-    // fetchAllConfigs
+    updateFlagsConfig
   } = useStudentStore();
   
   const [batchSettings, setBatchSettings] = useState<BatchConfig>({ ...batchConfig });
   const [remarksSettings, setRemarksSettings] = useState<RemarksConfig>({ ...remarksConfig });
   const [flagsSettings, setFlagsSettings] = useState<FlagsConfig>({ ...flagsConfig });
+  const [subjectChapters, setSubjectChapters] = useState<Record<string, string[]>>({});
+  const [selectedSubject, setSelectedSubject] = useState<string>('PHYSICS');
+  const [chapterText, setChapterText] = useState<string>('');
   
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [chaptersLoading, setChaptersLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Predefined values
   const predefinedBatches = [
@@ -43,26 +51,110 @@ const Settings: React.FC = () => {
     'SRUTHI.(WB)', 'SANDRA.(WB)', 'ATHIRA.(WB)', 'ARYA.R', 'LIMSY.PAULSON.(WB)', 
     'STENIYA.LIEONS.(WB)', 'SHINI.T.S.(WB)', 'CHAITRA', 'ANJU.K', 'MEGHA.MUKUNDAN', 
     'NOT ASSIGNED', 'ALBIN.VARGHESE', 'RAJESWARY.VISWANATHAN', 'SWATHY', 'SRUTHI.P', 
-    'JOYAL.P.JOSE', 'HARIKRISHNAN.R', 'ARPITHA.SHAJAN', 'SANJANA', 'NELSON', 
-    'VISWAM.MURALI', 'MANJIMA.JIMMY', 'ANOOP.MOHAN', 'VISAKHAN', 'ANJALI.K.DAS.(WB)', 
-    'ANANDALAKSHMI', 'JISHNA', 'DONA.MERIN.JOSE', 'RADHIKA.ANILKUMAR', 'SREELAKSHMI.P'
+    'SRUTHI.SATHYAN', 'SRUTHI.SURESH', 'SRUTHI.SURESH.KUMAR', 'SRUTHI.SURESH.KUMAR.NAIR'
   ];
   
   const predefinedHostels = [
-    'DS', 'ST.ANNS', 'MARIGOLD GRAND', 'HOSTEL REQUIRED', 'ST.JOHNS', 
-    'THE GUARDIAN', 'NEST GRAND', 'LAVERNA', 'B MADONA', 'B MARTHOMA', 'B ST.MARYS', 
-    'PETER CLAVER', 'LITTLE FLOWER', 'ST.AUGUSTINE', 'SDV'
+    'BOYS HOSTEL', 'GIRLS HOSTEL', 'DAY SCHOLAR'
   ];
   
   const predefinedStreams = ['FOUNDATION', 'ENGINEERING', 'MEDICAL'];
   
   const predefinedPrograms = ['FOUNDATION', 'EVENING', 'SPECIAL', 'SUPER', 'HYBRID', 'REPEATER', 'REGULAR'];
   
+  const predefinedSubjects = ['PHYSICS', 'CHEMISTRY', 'BOTANY', 'ZOOLOGY', 'MATHS'];
+  
   useEffect(() => {
     setBatchSettings({ ...batchConfig });
     setRemarksSettings({ ...remarksConfig });
     setFlagsSettings({ ...flagsConfig });
+    fetchSubjectChapters();
   }, [batchConfig, remarksConfig, flagsConfig]);
+  
+  const fetchSubjectChapters = async () => {
+    try {
+      setChaptersLoading(true);
+      const chapters = await getSubjectChapters();
+      setSubjectChapters(chapters || {});
+      
+      // Set the first subject as selected if none is selected
+      if (!selectedSubject && Object.keys(chapters || {}).length > 0) {
+        setSelectedSubject(Object.keys(chapters)[0]);
+        setChapterText((chapters[Object.keys(chapters)[0]] || []).join('\n'));
+      }
+    } catch (error) {
+      console.error('Error fetching subject chapters:', error);
+      try {
+        // Try to initialize default chapters if none exist
+        await initializeDefaultSubjectChapters();
+        const chapters = await getSubjectChapters();
+        setSubjectChapters(chapters || {});
+        
+        if (!selectedSubject && Object.keys(chapters || {}).length > 0) {
+          setSelectedSubject(Object.keys(chapters)[0]);
+          setChapterText((chapters[Object.keys(chapters)[0]] || []).join('\n'));
+        }
+      } catch (initError) {
+        console.error('Error initializing subject chapters:', initError);
+        toast.error('Failed to load subject chapters');
+      }
+    } finally {
+      setChaptersLoading(false);
+    }
+  };
+  
+  const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setSelectedSubject(value);
+    
+    // Update chapter text for the selected subject
+    if (subjectChapters[value]) {
+      setChapterText(subjectChapters[value].join('\n'));
+    } else {
+      setChapterText('');
+    }
+  };
+  
+  const handleChapterTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setChapterText(e.target.value);
+  };
+  
+  const saveSubjectChapters = async () => {
+    if (!selectedSubject) return;
+    
+    try {
+      setChaptersLoading(true);
+      setSaveSuccess(false);
+      setSaveError(false);
+      
+      // Parse chapters from text area
+      const chapters = chapterText.split('\n')
+        .map(line => line.trim())
+        .filter(line => line !== '');
+      
+      await updateSubjectChapters(selectedSubject, chapters);
+      
+      // Update local state
+      setSubjectChapters(prev => ({
+        ...prev,
+        [selectedSubject]: chapters
+      }));
+      
+      setSaveSuccess(true);
+      toast.success('Subject chapters saved successfully');
+    } catch (error) {
+      console.error('Error saving subject chapters:', error);
+      setSaveError(true);
+      toast.error('Failed to save subject chapters');
+    } finally {
+      setChaptersLoading(false);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 3000);
+    }
+  };
   
   const handleBatchChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
@@ -108,25 +200,51 @@ const Settings: React.FC = () => {
   };
   
   const handleSave = async () => {
-    setSaveSuccess(false);
-    setSaveError(false);
-    
     try {
+      setIsLoading(true);
+      setSaveSuccess(false);
+      setSaveError(false);
+      
+      // Update batch settings using store function
       const batchResult = await updateBatchConfig(batchSettings);
+      
+      // Update remarks settings using store function
       const remarksResult = await updateRemarksConfig(remarksSettings);
+      
+      // Update flags settings using store function
       const flagsResult = await updateFlagsConfig(flagsSettings);
+      
+      // Save current subject chapters if they've been modified
+      if (chapterText) {
+        const chapters = chapterText
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0);
+        
+        await updateSubjectChapters(selectedSubject, chapters);
+        
+        // Update local state
+        setSubjectChapters(prev => ({
+          ...prev,
+          [selectedSubject]: chapters
+        }));
+      }
       
       if (batchResult && remarksResult && flagsResult) {
         setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
-      } else {
-        setSaveError(true);
-        setTimeout(() => setSaveError(false), 3000);
+        toast.success('Settings saved successfully');
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setSaveSuccess(false);
+        }, 3000);
       }
     } catch (error) {
       console.error('Error saving settings:', error);
       setSaveError(true);
-      setTimeout(() => setSaveError(false), 3000);
+      toast.error('Failed to save settings');
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -153,246 +271,269 @@ const Settings: React.FC = () => {
   
   return (
     <Layout>
-      <div className="mb-6 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
-          <p className="text-gray-600">
-            Configure system settings and field options
-          </p>
-        </div>
-        {/* <Button
-          variant="secondary"
-          onClick={handleInitializeDefaults}
-          className="flex items-center"
-          disabled={isLoading}
-        >
-          <RefreshCw size={16} className="mr-2" />
-          Initialize Defaults
-        </Button> */}
-      </div>
-      
-      {saveSuccess && (
-        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">
-          Settings saved successfully!
-        </div>
-      )}
-      
-      {saveError && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
-          Error saving settings. Please try again.
-        </div>
-      )}
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Batch Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-lg font-semibold mb-4">Batch Settings</h2>
-          <p className="text-gray-600 mb-4">
-            Configure the available options for batches, teachers, hostels, etc.
-            Enter each option on a new line.
-          </p>
-          
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Batches
-              </label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleLoadPredefined('batches', predefinedBatches)}
-                className="text-xs"
-              >
-                Load Predefined
-              </Button>
+      <Toaster position="top-right" />
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-6">System Settings</h1>
+        
+        {saveSuccess && (
+          <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">
+            Settings saved successfully!
+          </div>
+        )}
+        
+        {saveError && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+            Error saving settings. Please try again.
+          </div>
+        )}
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Batch Configuration */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold mb-4">Batch Configuration</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Batches
+                </label>
+                <TextArea
+                  value={batchSettings.batches.join('\n')}
+                  onChange={(e) => handleBatchChange(e, 'batches')}
+                  rows={8}
+                  fullWidth
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleLoadPredefined('batches', predefinedBatches)}
+                  >
+                    Load Predefined
+                  </Button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Class Teachers
+                </label>
+                <TextArea
+                  value={batchSettings.teachers.join('\n')}
+                  onChange={(e) => handleBatchChange(e, 'teachers')}
+                  rows={8}
+                  fullWidth
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleLoadPredefined('teachers', predefinedTeachers)}
+                  >
+                    Load Predefined
+                  </Button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Hostels
+                </label>
+                <TextArea
+                  value={batchSettings.hostels.join('\n')}
+                  onChange={(e) => handleBatchChange(e, 'hostels')}
+                  rows={8}
+                  fullWidth
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleLoadPredefined('hostels', predefinedHostels)}
+                  >
+                    Load Predefined
+                  </Button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Streams
+                </label>
+                <TextArea
+                  value={batchSettings.streams.join('\n')}
+                  onChange={(e) => handleBatchChange(e, 'streams')}
+                  rows={4}
+                  fullWidth
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleLoadPredefined('streams', predefinedStreams)}
+                  >
+                    Load Predefined
+                  </Button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Programs
+                </label>
+                <TextArea
+                  value={batchSettings.programs.join('\n')}
+                  onChange={(e) => handleBatchChange(e, 'programs')}
+                  rows={4}
+                  fullWidth
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleLoadPredefined('programs', predefinedPrograms)}
+                  >
+                    Load Predefined
+                  </Button>
+                </div>
+              </div>
             </div>
-            <TextArea
-              rows={5}
-              value={batchSettings.batches.join('\n')}
-              onChange={(e) => handleBatchChange(e, 'batches')}
-              fullWidth
-            />
           </div>
           
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Teachers
-              </label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleLoadPredefined('teachers', predefinedTeachers)}
-                className="text-xs"
-              >
-                Load Predefined
-              </Button>
+          {/* Subject Chapters Configuration */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold mb-4">Subject Chapters Configuration</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Subject
+                </label>
+                <Select
+                  value={selectedSubject}
+                  onChange={handleSubjectChange}
+                  options={Object.keys(subjectChapters).length > 0 
+                    ? Object.keys(subjectChapters) 
+                    : predefinedSubjects}
+                  fullWidth
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Chapters (one per line)
+                </label>
+                <TextArea
+                  value={chapterText}
+                  onChange={handleChapterTextChange}
+                  rows={20}
+                  fullWidth
+                />
+              </div>
+              
+              <div className="flex justify-end">
+                <Button
+                  variant="primary"
+                  onClick={saveSubjectChapters}
+                  disabled={chaptersLoading}
+                  className="flex items-center"
+                >
+                  <Save size={16} className="mr-1" />
+                  Save Chapters
+                </Button>
+              </div>
             </div>
-            <TextArea
-              rows={5}
-              value={batchSettings.teachers.join('\n')}
-              onChange={(e) => handleBatchChange(e, 'teachers')}
-              fullWidth
-            />
           </div>
           
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Hostels
-              </label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleLoadPredefined('hostels', predefinedHostels)}
-                className="text-xs"
-              >
-                Load Predefined
-              </Button>
+          {/* Remarks Configuration */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold mb-4">Remarks Configuration</h2>
+            
+            <div className="space-y-4">
+              <Input
+                label="Remarks"
+                value={remarksSettings.remarks}
+                onChange={(e) => handleRemarksChange(e, 'remarks')}
+                fullWidth
+              />
+              
+              <Input
+                label="Remarks 1"
+                value={remarksSettings.remarks1}
+                onChange={(e) => handleRemarksChange(e, 'remarks1')}
+                fullWidth
+              />
+              
+              <Input
+                label="Remarks 2"
+                value={remarksSettings.remarks2}
+                onChange={(e) => handleRemarksChange(e, 'remarks2')}
+                fullWidth
+              />
+              
+              <Input
+                label="Remarks 3"
+                value={remarksSettings.remarks3}
+                onChange={(e) => handleRemarksChange(e, 'remarks3')}
+                fullWidth
+              />
+              
+              <Input
+                label="Remarks 4"
+                value={remarksSettings.remarks4}
+                onChange={(e) => handleRemarksChange(e, 'remarks4')}
+                fullWidth
+              />
             </div>
-            <TextArea
-              rows={5}
-              value={batchSettings.hostels.join('\n')}
-              onChange={(e) => handleBatchChange(e, 'hostels')}
-              fullWidth
-            />
           </div>
           
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Programs
-              </label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleLoadPredefined('programs', predefinedPrograms)}
-                className="text-xs"
-              >
-                Load Predefined
-              </Button>
+          {/* Flags Configuration */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold mb-4">Flags Configuration</h2>
+            
+            <div className="space-y-4">
+              <Input
+                label="Flag 1"
+                value={flagsSettings.flag1}
+                onChange={(e) => handleFlagsChange(e, 'flag1')}
+                fullWidth
+              />
+              
+              <Input
+                label="Flag 2"
+                value={flagsSettings.flag2}
+                onChange={(e) => handleFlagsChange(e, 'flag2')}
+                fullWidth
+              />
+              
+              <Input
+                label="Flag 3"
+                value={flagsSettings.flag3}
+                onChange={(e) => handleFlagsChange(e, 'flag3')}
+                fullWidth
+              />
+              
+              <Input
+                label="Flag 4"
+                value={flagsSettings.flag4}
+                onChange={(e) => handleFlagsChange(e, 'flag4')}
+                fullWidth
+              />
             </div>
-            <TextArea
-              rows={5}
-              value={batchSettings.programs.join('\n')}
-              onChange={(e) => handleBatchChange(e, 'programs')}
-              fullWidth
-            />
-          </div>
-          
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Streams
-              </label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleLoadPredefined('streams', predefinedStreams)}
-                className="text-xs"
-              >
-                Load Predefined
-              </Button>
-            </div>
-            <TextArea
-              rows={5}
-              value={batchSettings.streams.join('\n')}
-              onChange={(e) => handleBatchChange(e, 'streams')}
-              fullWidth
-            />
           </div>
         </div>
         
-        {/* Remarks and Flags Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-lg font-semibold mb-4">Field Labels</h2>
-          <p className="text-gray-600 mb-4">
-            Customize the display labels for remarks and flag fields
-          </p>
-          
-          <div className="mb-6">
-            <h3 className="font-medium text-gray-700 mb-2">Remarks Fields</h3>
-            
-            <Input
-              label="Remarks"
-              value={remarksSettings.remarks}
-              onChange={(e) => handleRemarksChange(e, 'remarks')}
-              fullWidth
-            />
-            
-            <Input
-              label="Remarks 1"
-              value={remarksSettings.remarks1}
-              onChange={(e) => handleRemarksChange(e, 'remarks1')}
-              fullWidth
-            />
-            
-            <Input
-              label="Remarks 2"
-              value={remarksSettings.remarks2}
-              onChange={(e) => handleRemarksChange(e, 'remarks2')}
-              fullWidth
-            />
-            
-            <Input
-              label="Remarks 3"
-              value={remarksSettings.remarks3}
-              onChange={(e) => handleRemarksChange(e, 'remarks3')}
-              fullWidth
-            />
-            
-            <Input
-              label="Remarks 4"
-              value={remarksSettings.remarks4}
-              onChange={(e) => handleRemarksChange(e, 'remarks4')}
-              fullWidth
-            />
-          </div>
-          
-          <div>
-            <h3 className="font-medium text-gray-700 mb-2">Flag Fields</h3>
-            
-            <Input
-              label="Flag 1"
-              value={flagsSettings.flag1}
-              onChange={(e) => handleFlagsChange(e, 'flag1')}
-              fullWidth
-            />
-            
-            <Input
-              label="Flag 2"
-              value={flagsSettings.flag2}
-              onChange={(e) => handleFlagsChange(e, 'flag2')}
-              fullWidth
-            />
-            
-            <Input
-              label="Flag 3"
-              value={flagsSettings.flag3}
-              onChange={(e) => handleFlagsChange(e, 'flag3')}
-              fullWidth
-            />
-            
-            <Input
-              label="Flag 4"
-              value={flagsSettings.flag4}
-              onChange={(e) => handleFlagsChange(e, 'flag4')}
-              fullWidth
-            />
-          </div>
+        <div className="mt-6 flex justify-end">
+          <Button
+            variant="primary"
+            onClick={handleSave}
+            disabled={isLoading}
+            className="flex items-center"
+          >
+            <Save size={16} className="mr-1" />
+            Save All Settings
+          </Button>
         </div>
-      </div>
-      
-      <div className="mt-6 flex justify-end">
-        <Button
-          variant="primary"
-          onClick={handleSave}
-          className="flex items-center"
-          disabled={isLoading}
-        >
-          <Save size={16} className="mr-2" />
-          Save Settings
-        </Button>
       </div>
     </Layout>
   );

@@ -16,11 +16,23 @@ const configSchema = new mongoose.Schema(
         "idCards",
         "tabs",
         "joinedStatuses",
-        "syllabuses"
+        "syllabuses",
+        "subjectChapters"
       ],
-      unique: true
+      unique: true,
+      index: true
     },
-    values: [{ type: String }],
+    values: {
+      type: [String],
+      required: true
+    },
+    // For subject chapters, we need a more structured approach
+    // This will be used only for 'subjectChapters' category
+    subjectChapters: {
+      type: Map,
+      of: [String],
+      default: new Map()
+    },
     lastUpdatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"

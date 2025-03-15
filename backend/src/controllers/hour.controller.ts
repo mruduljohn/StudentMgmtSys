@@ -803,7 +803,7 @@ export const getHourOptions = async (req: Request, res: Response): Promise<void>
     const classTeachers = teacherConfig ? teacherConfig.values : [];
     
     // Get unique subjects - use predefined subjects
-    const predefinedSubjects = ['PHY', 'CHEM', 'ZLG', 'BOT', 'MAT'];
+    const predefinedSubjects = ['PHYSICS', 'CHEMISTRY', 'BOTANY', 'ZOOLOGY', 'MATHS'];
     
     // Get unique modes from database
     const modesFromDB = await Hour.distinct('mode', matchStage);

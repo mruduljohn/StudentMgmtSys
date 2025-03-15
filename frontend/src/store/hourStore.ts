@@ -8,7 +8,9 @@ import {
   deleteHour as apiDeleteHour,
   getHourStats,
   getChapterStatus,
-  getHourOptions
+  getHourOptions,
+  getSubjectChapters,
+  initializeDefaultSubjectChapters
 } from '../api';
 
 interface ApiParams {
@@ -46,11 +48,12 @@ class HourStore {
   sortOrder = observable.box<'asc' | 'desc'>('desc');
   
   options = observable({
-    batches: [] as string[],
     subjects: [] as string[],
+    batches: [] as string[],
     modes: [] as string[],
     classTeachers: [] as string[],
-    chapterStatuses: ['NOT STARTED', 'ONGOING', 'COMPLETED']
+    statuses: ['NOT STARTED', 'ONGOING', 'COMPLETED'],
+    subjectChapters: {} as Record<string, string[]>
   });
   
   constructor() {
@@ -285,25 +288,39 @@ class HourStore {
   });
   
   fetchOptions = action(async () => {
-    this.loading.set(true);
-    
     try {
+      this.loading.set(true);
+      
+      // Fetch hour options
       const options = await getHourOptions();
       
-      runInAction(() => {
-        this.options.batches = options.batches;
-        this.options.subjects = options.subjects;
-        this.options.modes = options.modes;
-        this.options.classTeachers = options.classTeachers;
-      });
+      // Fetch subject chapters
+      let subjectChapters = {};
+      try {
+        subjectChapters = await getSubjectChapters();
+      } catch (error) {
+        console.error('Error fetching subject chapters, initializing defaults:', error);
+        try {
+          await initializeDefaultSubjectChapters();
+          subjectChapters = await getSubjectChapters();
+        } catch (initError) {
+          console.error('Failed to initialize subject chapters:', initError);
+        }
+      }
       
-      return options;
+      runInAction(() => {
+        this.options.subjects = options.subjects || [];
+        this.options.batches = options.batches || [];
+        this.options.modes = options.modes || [];
+        this.options.classTeachers = options.classTeachers || [];
+        this.options.subjectChapters = subjectChapters || {};
+        this.loading.set(false);
+      });
     } catch (error) {
-      console.error("Error fetching hour options:", error);
-      this.error.set("Failed to fetch hour options");
-      return null;
-    } finally {
-      this.loading.set(false);
+      runInAction(() => {
+        this.error.set(error instanceof Error ? error.message : 'Failed to fetch options');
+        this.loading.set(false);
+      });
     }
   });
   

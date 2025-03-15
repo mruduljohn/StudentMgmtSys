@@ -33,7 +33,7 @@ const HourModal: React.FC<HourModalProps> = ({
 }) => {
   const hourStore = useHourStore();
   const authStore = useAuthStore();
-  const { batches, subjects, modes } = hourStore.getOptions;
+  const { batches, subjects, modes, classTeachers, subjectChapters } = hourStore.getOptions;
   const isAdmin = authStore.user?.role === 'ADMIN';
   
   const [formData, setFormData] = useState<Partial<Hour>>({
@@ -58,6 +58,12 @@ const HourModal: React.FC<HourModalProps> = ({
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Get chapters for the selected subject
+  const getChaptersForSubject = () => {
+    if (!formData.subject) return [];
+    return subjectChapters[formData.subject as string] || [];
+  };
   
   useEffect(() => {
     if (hour) {
@@ -122,6 +128,14 @@ const HourModal: React.FC<HourModalProps> = ({
     
     setErrors({});
   }, [hour, open]);
+  
+  // Reset chapter when subject changes
+  useEffect(() => {
+    if (formData.subject) {
+      // Reset chapter when subject changes
+      setFormData(prev => ({ ...prev, chapter: '' }));
+    }
+  }, [formData.subject]);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -285,11 +299,12 @@ const HourModal: React.FC<HourModalProps> = ({
           disabled={!isAdmin}
         />
         
-        <Input
+        <Select
           label="Chapter"
           name="chapter"
           value={formData.chapter || ''}
-          onChange={handleChange}
+          onChange={handleSelectChange}
+          options={getChaptersForSubject()}
           error={errors.chapter}
           fullWidth
           disabled={!isAdmin}
@@ -311,7 +326,7 @@ const HourModal: React.FC<HourModalProps> = ({
           name="classTeacher"
           value={formData.classTeacher || ''}
           onChange={handleSelectChange}
-          options={hourStore.getOptions.classTeachers}
+          options={classTeachers}
           error={errors.classTeacher}
           fullWidth
           disabled={!isAdmin}
