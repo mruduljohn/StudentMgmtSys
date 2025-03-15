@@ -166,7 +166,7 @@ export const uploadStudentCSV = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await api.post('/students/upload-csv', formData, {
+  const response = await api.post('/students/upload/csv', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -179,7 +179,7 @@ export const uploadNewStudentsCSV = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await api.post('/students/upload-new-csv', formData, {
+  const response = await api.post('/upload-new-csv', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -192,7 +192,7 @@ export const uploadUpdateStudentsCSV = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await api.post('/students/upload-update-csv', formData, {
+  const response = await api.post('/upload-update-csv', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
