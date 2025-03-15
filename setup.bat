@@ -6,29 +6,6 @@ setlocal EnableDelayedExpansion
 REM Create a temporary file to store ipconfig output
 ipconfig > %TEMP%\ipconfig_output.txt
 
-REM First try to find Wi-Fi connection
-echo Searching for Wi-Fi connection first...
-FOR /F "tokens=1-2 delims=:" %%a IN ('findstr /C:"IPv4 Address" /C:"Wi-Fi" %TEMP%\ipconfig_output.txt') DO (
-    set line=%%a
-    if "!line!" NEQ "" (
-        if "!line:Wi-Fi=!" NEQ "!line!" (
-            FOR /F "tokens=1-2 delims=:" %%c IN ('findstr /C:"IPv4 Address" /C:"Wi-Fi" %TEMP%\ipconfig_output.txt') DO (
-                set ip_line=%%c
-                set ip=%%d
-                if "!ip_line:IPv4=!" NEQ "!ip_line!" (
-                    set ip=!ip:~1!
-                    if NOT "!ip:~0,3!"=="127" (
-                        if NOT "!ip!"=="" (
-                            set HOST_IP=!ip!
-                            echo Found Wi-Fi IP address: !HOST_IP!
-                            goto :found_ip
-                        )
-                    )
-                )
-            )
-        )
-    )
-)
 
 REM If Wi-Fi not found, try any other active connection
 echo Wi-Fi connection not found, trying other connections...
