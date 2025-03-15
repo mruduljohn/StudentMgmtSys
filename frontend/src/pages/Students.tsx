@@ -777,16 +777,14 @@ const Students: React.FC = observer(() => {
         </div>
         
         <div className="flex flex-wrap gap-2">
-          {isAdmin && (
-            <Button
-              variant="primary"
-              className="flex items-center"
-              onClick={() => setIsAddModalOpen(true)}
-            >
-              <Plus size={16} className="mr-1" />
-              Add Student
-            </Button>
-          )}
+          <Button
+            variant="primary"
+            className="flex items-center"
+            onClick={() => setIsAddModalOpen(true)}
+          >
+            <Plus size={16} className="mr-1" />
+            Add Student
+          </Button>
           
           <Button
             variant="secondary"

@@ -58,8 +58,12 @@ const StudentForm: React.FC<StudentFormProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fieldConfigs = getFieldConfigs();
   
-  // Filter fields based on user role
+  // Filter fields based on user role and mode
   const visibleFields = fieldConfigs.filter(field => {
+    // When adding a student, show all fields regardless of user role
+    if (mode === 'add') return true;
+    
+    // When editing, apply role-based restrictions
     if (isAdmin) return true;
     return field.editable;
   });
@@ -102,7 +106,8 @@ const StudentForm: React.FC<StudentFormProps> = ({
     fieldConfigs.forEach(field => {
       if (field.validation && formData[field.id as keyof Student] !== undefined) {
         const value = formData[field.id as keyof Student];
-        if (!field.validation(value)) {
+        // Ensure value is not undefined before passing to validation function
+        if (value !== undefined && !field.validation(value as string | number)) {
           newErrors[field.id] = field.errorMessage || 'Invalid value';
         }
       }
@@ -183,11 +188,11 @@ const StudentForm: React.FC<StudentFormProps> = ({
     const value = formData[id];
     const error = errors[field.id];
     
-    // Skip fields that mentors can't edit if user is a mentor
-    if (!isAdmin && !field.editable) return null;
+    // When adding a student, all fields are editable regardless of user role
+    const isAddingStudent = mode === 'add';
     
-    // For mentors, only allow editing students they are assigned to
-    if (!isAdmin && student) {
+    // For mentors editing students, only allow editing students they are assigned to
+    if (!isAdmin && !isAddingStudent && student) {
       // The username is already in the correct format (e.g., "SIJO.JAMES")
       // The class teacher name in the student record is in display format (e.g., "Sijo James")
       // We need to convert the class teacher name to username format for comparison
@@ -235,7 +240,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
             onChange={handleChange}
             options={options}
             error={error}
-            disabled={!isAdmin && !field.editable}
+            disabled={!isAdmin && !isAddingStudent && !field.editable}
             fullWidth
           />
         );
@@ -251,7 +256,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
             value={value as number}
             onChange={handleChange}
             error={error}
-            disabled={!isAdmin && !field.editable}
+            disabled={!isAdmin && !isAddingStudent && !field.editable}
             fullWidth
           />
         );
@@ -266,7 +271,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
             value={value as string}
             onChange={handleChange}
             error={error}
-            disabled={!isAdmin && !field.editable}
+            disabled={!isAdmin && !isAddingStudent && !field.editable}
             fullWidth
           />
         );

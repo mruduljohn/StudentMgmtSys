@@ -39,42 +39,55 @@ export const getAllHours = async (req: Request, res: Response): Promise<void> =>
       // Get the mentor's name and username
       const mentorName = req.user.name;
       const mentorUsername = req.user.username;
+      const mentorBatch = (req.user as any).class; // Get mentor's assigned batch/class
       
-      console.log(`Filtering hours for mentor: ${mentorName} (${mentorUsername})`);
+      console.log(`Filtering hours for mentor: ${mentorName} (${mentorUsername}), assigned to batch: ${mentorBatch}`);
+      
+      // Restrict to mentor's batch, but only if they have a batch assigned
+      if (mentorBatch && mentorBatch.trim() !== '') {
+        filter.batch = mentorBatch;
+      }
       
       // Use a case-insensitive regex to match either the mentor's name or username
       // This provides flexibility during the transition to using usernames
-      filter.$or = [
+      const classTeacherFilter = [
         { classTeacher: new RegExp(`^${mentorName}$`, 'i') },
         { classTeacher: new RegExp(`^${mentorUsername}$`, 'i') }
       ];
       
+      // Combine batch and classTeacher filters
+      if (filter.$or) {
+        // If there's already an $or from search, we need to use $and to combine conditions
+        filter.$and = [
+          { $or: filter.$or },
+          { $or: classTeacherFilter }
+        ];
+        delete filter.$or;
+      } else {
+        filter.$or = classTeacherFilter;
+      }
+      
       console.log("Filter applied:", filter);
     }
     
-    // Build sort object
-    const sortField = req.query.sortBy as string || 'createdAt';
-    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
-    const sort: any = { [sortField]: sortOrder };
+    // Get total count for pagination
+    const totalHours = await Hour.countDocuments(filter);
     
-    // Execute query with pagination
+    // Get hours with pagination
     const hours = await Hour.find(filter)
-      .sort(sort)
+      .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
       .populate('createdBy', 'name username')
       .populate('updatedBy', 'name username');
     
-    // Get total count for pagination
-    const totalHours = await Hour.countDocuments(filter);
-    const totalPages = Math.ceil(totalHours / limit);
-    
     res.json({
       hours,
-      totalHours,
-      totalPages,
-      currentPage: page,
-      pageSize: limit
+      pagination: {
+        total: totalHours,
+        page,
+        pages: Math.ceil(totalHours / limit)
+      }
     });
   } catch (error) {
     console.error("Error fetching hours:", error);
@@ -100,6 +113,13 @@ export const getHourById = async (req: Request, res: Response): Promise<void> =>
     if (req.user?.role === "MENTOR") {
       const mentorName = req.user.name;
       const mentorUsername = req.user.username;
+      const mentorBatch = (req.user as any).class; // Get mentor's assigned batch/class
+      
+      // Check if mentor is viewing an hour for their own batch, but only if they have a batch assigned
+      if (mentorBatch && mentorBatch.trim() !== '' && hour.batch !== mentorBatch) {
+        res.status(403).json({ message: "Mentors can only view hours for their own batch" });
+        return;
+      }
       
       // Case-insensitive comparison with either name or username
       if (hour.classTeacher.toLowerCase() !== mentorName.toLowerCase() && 
@@ -131,17 +151,17 @@ export const addHour = async (req: Request, res: Response): Promise<void> => {
     if (req.user?.role === "MENTOR") {
       const mentorName = req.user.name;
       const mentorUsername = req.user.username;
+      const mentorBatch = (req.user as any).class; // Get mentor's assigned batch/class
       
-      console.log(`Mentor ${mentorName} (${mentorUsername}) is adding an hour for class teacher: ${hourData.classTeacher}`);
+      console.log(`Mentor ${mentorName} (${mentorUsername}) is adding an hour for batch: ${hourData.batch}, assigned to batch: ${mentorBatch}`);
       
-      // Case-insensitive comparison with either name or username
-      if (hourData.classTeacher.toLowerCase() !== mentorName.toLowerCase() && 
-          hourData.classTeacher.toLowerCase() !== mentorUsername.toLowerCase()) {
-        res.status(403).json({ message: "You can only add hours for your own class" });
+      // Check if mentor is adding for their own batch, but only if they have a batch assigned
+      if (mentorBatch && mentorBatch.trim() !== '' && hourData.batch !== mentorBatch) {
+        res.status(403).json({ message: "Mentors can only add hours for their own batch" });
         return;
       }
       
-      // Use the username format for classTeacher to ensure consistency
+      // Set the classTeacher to their username
       hourData.classTeacher = mentorUsername;
       console.log(`Setting classTeacher to username format: ${mentorUsername}`);
     }
@@ -239,12 +259,20 @@ export const updateHour = async (req: Request, res: Response): Promise<void> => 
     if (req.user?.role === "MENTOR") {
       const mentorName = req.user.name;
       const mentorUsername = req.user.username;
+      const mentorBatch = (req.user as any).class; // Get mentor's assigned batch/class
       
-      console.log(`Mentor ${mentorName} (${mentorUsername}) is trying to update hour with classTeacher: ${hour.classTeacher}`);
+      console.log(`Mentor ${mentorName} (${mentorUsername}) is trying to update hour with classTeacher: ${hour.classTeacher} and batch: ${hour.batch}`);
       console.log(`Update data:`, JSON.stringify(updateData));
       
-      // Case-insensitive comparison
-      if (hour.classTeacher.toLowerCase() !== mentorName.toLowerCase()) {
+      // Check if mentor is updating an hour for their own batch, but only if they have a batch assigned
+      if (mentorBatch && mentorBatch.trim() !== '' && hour.batch !== mentorBatch) {
+        res.status(403).json({ message: "Mentors can only update hours for their own batch" });
+        return;
+      }
+      
+      // Case-insensitive comparison with either name or username
+      if (hour.classTeacher.toLowerCase() !== mentorName.toLowerCase() && 
+          hour.classTeacher.toLowerCase() !== mentorUsername.toLowerCase()) {
         res.status(403).json({ message: "Access denied to update this hour" });
         return;
       }
@@ -252,9 +280,16 @@ export const updateHour = async (req: Request, res: Response): Promise<void> => 
       // For mentors, only restrict changing the classTeacher field
       // Since mentors and class teachers are the same, they should be able to update most fields
       if (updateData.classTeacher !== undefined && 
-          updateData.classTeacher.toLowerCase() !== hour.classTeacher.toLowerCase()) {
+          updateData.classTeacher.toLowerCase() !== mentorUsername.toLowerCase()) {
         console.log("Mentor attempted to change classTeacher field:", updateData.classTeacher);
-        res.status(403).json({ message: "You don't have permission to change the class teacher" });
+        res.status(403).json({ message: "You cannot change the classTeacher field" });
+        return;
+      }
+      
+      // Prevent mentors from changing the batch
+      if (updateData.batch !== undefined && updateData.batch !== hour.batch) {
+        console.log("Mentor attempted to change batch field:", updateData.batch);
+        res.status(403).json({ message: "You cannot change the batch field" });
         return;
       }
       
@@ -400,6 +435,15 @@ export const deleteHour = async (req: Request, res: Response): Promise<void> => 
     if (req.user?.role === "MENTOR") {
       const mentorName = req.user.name;
       const mentorUsername = req.user.username;
+      const mentorBatch = (req.user as any).class; // Get mentor's assigned batch/class
+      
+      console.log(`Mentor ${mentorName} (${mentorUsername}) is trying to delete hour with classTeacher: ${hour.classTeacher} and batch: ${hour.batch}`);
+      
+      // Check if mentor is deleting an hour for their own batch, but only if they have a batch assigned
+      if (mentorBatch && mentorBatch.trim() !== '' && hour.batch !== mentorBatch) {
+        res.status(403).json({ message: "Mentors can only delete hours for their own batch" });
+        return;
+      }
       
       // Case-insensitive comparison with either name or username
       if (hour.classTeacher.toLowerCase() !== mentorName.toLowerCase() && 
@@ -448,6 +492,12 @@ export const getHourStats = async (req: Request, res: Response): Promise<void> =
     if (req.user?.role === "MENTOR") {
       const mentorName = req.user.name;
       const mentorUsername = req.user.username;
+      const mentorBatch = (req.user as any).class; // Get mentor's assigned batch/class
+      
+      // Restrict to mentor's batch, but only if they have a batch assigned
+      if (mentorBatch && mentorBatch.trim() !== '') {
+        matchStage.batch = mentorBatch;
+      }
       
       // Use $or to match either name or username
       matchStage.$or = [
@@ -745,6 +795,13 @@ export const getChapterStatus = async (req: Request, res: Response): Promise<voi
     if (req.user?.role === "MENTOR") {
       const mentorName = req.user.name;
       const mentorUsername = req.user.username;
+      const mentorBatch = (req.user as any).class; // Get mentor's assigned batch/class
+      
+      // Restrict to mentor's batch, but only if they have a batch assigned
+      if (mentorBatch && mentorBatch.trim() !== '' && batch !== mentorBatch) {
+        res.status(403).json({ message: "Mentors can only view chapter status for their own batch" });
+        return;
+      }
       
       // Use $or to match either name or username
       matchStage.$or = [
@@ -786,6 +843,12 @@ export const getHourOptions = async (req: Request, res: Response): Promise<void>
     if (req.user?.role === "MENTOR") {
       const mentorName = req.user.name;
       const mentorUsername = req.user.username;
+      const mentorBatch = (req.user as any).class; // Get mentor's assigned batch/class
+      
+      // Restrict to mentor's batch, but only if they have a batch assigned
+      if (mentorBatch && mentorBatch.trim() !== '') {
+        matchStage.batch = mentorBatch;
+      }
       
       // Use $or to match either name or username
       matchStage.$or = [
@@ -811,9 +874,18 @@ export const getHourOptions = async (req: Request, res: Response): Promise<void>
     // Ensure both ONLINE and OFFLINE are always included
     const modes = Array.from(new Set([...modesFromDB, 'ONLINE', 'OFFLINE'])).sort();
     
+    // For mentors, filter batches to only show their assigned batch
+    let filteredBatches = batches;
+    if (req.user?.role === "MENTOR") {
+      const mentorBatch = (req.user as any).class;
+      if (mentorBatch && mentorBatch.trim() !== '') {
+        filteredBatches = batches.filter(batch => batch === mentorBatch);
+      }
+    }
+    
     res.json({
       options: {
-        batches: batches.sort(),
+        batches: filteredBatches.sort(),
         subjects: predefinedSubjects,
         modes: modes,
         classTeachers: classTeachers.sort()

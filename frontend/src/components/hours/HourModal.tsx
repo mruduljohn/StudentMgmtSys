@@ -115,7 +115,8 @@ const HourModal: React.FC<HourModalProps> = ({
         completedHours: 0,
         remainingHoursNeeded: 0,
         chapterStatus: 'NOT STARTED',
-        classTeacher: '',
+        // For mentors, pre-fill the classTeacher field with their username
+        classTeacher: !isAdmin && authStore.user ? authStore.user.username : '',
         averageMarksOfBatch: 0,
         numberOfAPlus: 0,
         remarks1: '',
@@ -127,7 +128,7 @@ const HourModal: React.FC<HourModalProps> = ({
     }
     
     setErrors({});
-  }, [hour, open]);
+  }, [hour, open, isAdmin, authStore.user]);
   
   // Reset chapter when subject changes
   useEffect(() => {
@@ -253,7 +254,9 @@ const HourModal: React.FC<HourModalProps> = ({
       newErrors.chapterStatus = 'Chapter status is required';
     }
     
-    if (!formData.classTeacher) {
+    // Only validate classTeacher for admin users
+    // For mentors, we'll set it automatically
+    if (isAdmin && !formData.classTeacher) {
       newErrors.classTeacher = 'Class teacher is required';
     }
     
@@ -262,10 +265,20 @@ const HourModal: React.FC<HourModalProps> = ({
   };
   
   const handleSubmit = () => {
+    // For mentors, automatically set the classTeacher field to their username
+    if (!isAdmin && authStore.user) {
+      setFormData(prev => ({ 
+        ...prev, 
+        classTeacher: authStore.user?.username || ''
+      }));
+    }
+    
     if (validateForm()) {
       // Format the data before submitting
       const submissionData = {
         ...formData,
+        // For mentors, ensure classTeacher is set to their username
+        ...((!isAdmin && authStore.user) ? { classTeacher: authStore.user.username } : {}),
         examDate: formData.examDate ? new Date(formData.examDate as string).toISOString() : undefined
       };
       
@@ -276,7 +289,7 @@ const HourModal: React.FC<HourModalProps> = ({
   return (
     <Modal isOpen={open} onClose={onClose} title={title} size="lg">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Admin-only fields */}
+        {/* Batch field - Now accessible to mentors */}
         <Select
           label="Batch"
           name="batch"
@@ -285,9 +298,9 @@ const HourModal: React.FC<HourModalProps> = ({
           options={batches}
           error={errors.batch}
           fullWidth
-          disabled={!isAdmin}
         />
         
+        {/* Subject field - Now accessible to mentors */}
         <Select
           label="Subject"
           name="subject"
@@ -296,9 +309,9 @@ const HourModal: React.FC<HourModalProps> = ({
           options={subjects}
           error={errors.subject}
           fullWidth
-          disabled={!isAdmin}
         />
         
+        {/* Chapter field - Now accessible to mentors */}
         <Select
           label="Chapter"
           name="chapter"
@@ -307,9 +320,9 @@ const HourModal: React.FC<HourModalProps> = ({
           options={getChaptersForSubject()}
           error={errors.chapter}
           fullWidth
-          disabled={!isAdmin}
         />
         
+        {/* Mode field - Now accessible to mentors */}
         <Select
           label="Mode"
           name="mode"
@@ -318,13 +331,12 @@ const HourModal: React.FC<HourModalProps> = ({
           options={modes}
           error={errors.mode}
           fullWidth
-          disabled={!isAdmin}
         />
         
         <Select
           label="Class Teacher"
           name="classTeacher"
-          value={formData.classTeacher || ''}
+          value={formData.classTeacher || (!isAdmin && authStore.user ? authStore.user.username : '')}
           onChange={handleSelectChange}
           options={classTeachers}
           error={errors.classTeacher}

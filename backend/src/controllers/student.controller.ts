@@ -212,16 +212,15 @@ export const addStudent = async (req: Request, res: Response): Promise<void> => 
     // Create new student
     const student = await Student.create(studentData);
     
-    // If mentor is creating a student, assign it to them
+    // If mentor is creating a student
     if (req.user?.role === "MENTOR") {
-      // Ensure the classTeacher is set to the mentor's name
-      student.classTeacher = req.user.name;
-      await student.save();
-      
-      // Add student to mentor's assigned students
-      await User.findByIdAndUpdate(req.user.id, {
-        $push: { assignedStudents: student._id }
-      });
+      // Only assign the student to the mentor if the classTeacher matches the mentor's name or username
+      if (student.classTeacher === req.user.name || student.classTeacher === req.user.username) {
+        // Add student to mentor's assigned students
+        await User.findByIdAndUpdate(req.user.id, {
+          $push: { assignedStudents: student._id }
+        });
+      }
     }
     
     // Log student creation
@@ -256,13 +255,8 @@ export const updateStudent = async (req: Request, res: Response): Promise<void> 
     
     // Check if MENTOR has access to this student
     if (req.user?.role === "MENTOR") {
-      // Convert the class teacher name to username format for comparison
-      // e.g., "Sijo James" -> "SIJO.JAMES"
-      const classTeacherAsUsername = student.classTeacher 
-        ? student.classTeacher.toUpperCase().replace(/\s+/g, '.')
-        : '';
-      
-      if (classTeacherAsUsername !== req.user.username) {
+      // Check if the class teacher matches either the mentor's name or username
+      if (student.classTeacher !== req.user.name && student.classTeacher !== req.user.username) {
         res.status(403).json({ message: "Access denied to update this student record" });
         return;
       }
@@ -370,9 +364,16 @@ export const deleteStudent = async (req: Request, res: Response): Promise<void> 
       return;
     }
     
-    // Only ADMIN can delete students
-    if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ message: "Only administrators can delete students" });
+    // Check if user has permission to delete the student
+    if (req.user?.role === "MENTOR") {
+      // Mentors can only delete students assigned to them
+      if (student.classTeacher !== req.user.name && student.classTeacher !== req.user.username) {
+        res.status(403).json({ message: "Access denied to delete this student record" });
+        return;
+      }
+    } else if (req.user?.role !== "ADMIN") {
+      // Other roles (if any) cannot delete students
+      res.status(403).json({ message: "Only administrators and assigned mentors can delete students" });
       return;
     }
     
