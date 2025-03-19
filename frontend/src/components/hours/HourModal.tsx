@@ -397,7 +397,7 @@ const HourModal: React.FC<HourModalProps> = ({
           )}
         </div>
         
-        {/* Exam Date - Admin only */}
+        {/* Exam Date - Now accessible to mentors */}
         <Input
           label="Exam Date"
           name="examDate"
@@ -405,7 +405,6 @@ const HourModal: React.FC<HourModalProps> = ({
           value={formData.examDate as string || ''}
           onChange={handleChange}
           fullWidth
-          disabled={!isAdmin}
         />
         
         {/* Hours fields - Editable by both admin and mentors */}

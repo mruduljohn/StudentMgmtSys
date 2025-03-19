@@ -207,6 +207,10 @@ const UserManagement: React.FC = () => {
         
         {users.length === 0 ? (
           <p className="text-gray-500">No users found.</p>
+        ) : isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="text-lg">Loading user data...</div>
+          </div>
         ) : isMobile ? (
           <MobileTable
             columns={[
@@ -222,6 +226,7 @@ const UserManagement: React.FC = () => {
               class: user.class || '-'
             }))}
             priorityFields={['name', 'username', 'role']}
+            onRowClick={(user) => handleEdit(user as User)}
           />
         ) : (
           <div className="overflow-x-auto">

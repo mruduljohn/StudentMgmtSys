@@ -11,14 +11,16 @@ interface StudentFormProps {
   student?: Student;
   onClose: () => void;
   mode: 'add' | 'edit';
+  onExistingStudent?: (studentId: string) => void;
 }
 
 const StudentForm: React.FC<StudentFormProps> = ({
   student,
   onClose,
   mode,
+  onExistingStudent,
 }) => {
-  const { addStudent, updateStudent, batchConfig, fetchAllConfigs } = useStudentStore();
+  const { addStudent, updateStudent, batchConfig, fetchAllConfigs, findStudent } = useStudentStore();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
   
@@ -56,6 +58,8 @@ const StudentForm: React.FC<StudentFormProps> = ({
   );
   
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [successMessage, setSuccessMessage] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const fieldConfigs = getFieldConfigs();
   
   // Filter fields based on user role and mode
@@ -87,6 +91,11 @@ const StudentForm: React.FC<StudentFormProps> = ({
     // Clear error for this field
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    
+    // Clear success message when form is edited
+    if (successMessage) {
+      setSuccessMessage('');
     }
   };
   
@@ -136,10 +145,14 @@ const StudentForm: React.FC<StudentFormProps> = ({
   };
   
   // Update the handleSubmit function to map display values to backend values
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validate()) return;
+    
+    setIsSubmitting(true);
+    setErrors({});
+    setSuccessMessage('');
     
     // Create a copy of the form data
     const submissionData = { ...formData };
@@ -155,30 +168,94 @@ const StudentForm: React.FC<StudentFormProps> = ({
     }
     
     // Submit the form
-    if (mode === 'add') {
-      addStudent(submissionData)
-        .then(() => {
+    try {
+      if (mode === 'add') {
+        // Check if student ID already exists
+        if (formData.studentId) {
+          try {
+            const existingStudent = await findStudent(formData.studentId as string);
+            if (existingStudent) {
+              setErrors(prev => ({
+                ...prev,
+                studentId: 'Student ID already exists',
+                form: 'A student with this ID already exists.'
+              }));
+              
+              // Call the callback to inform parent component about existing student
+              if (onExistingStudent) {
+                onExistingStudent(formData.studentId as string);
+              }
+              
+              setIsSubmitting(false);
+              return;
+            }
+          } catch (error: unknown) {
+            // If the error is not a 404 (not found), it's a different error
+            const err = error as { response?: { status?: number; data?: { message?: string } } };
+            if (err.response && err.response.status !== 404) {
+              console.error('Error checking student existence:', error);
+              setErrors(prev => ({
+                ...prev,
+                form: 'Error checking student existence. Please try again.'
+              }));
+              setIsSubmitting(false);
+              return;
+            }
+            // If it's a 404, the student doesn't exist, so we can proceed
+          }
+        }
+        
+        // If we get here, the student ID doesn't exist yet, so proceed with adding
+        await addStudent(submissionData);
+        setSuccessMessage('Student added successfully!');
+        
+        // Wait for 1.5 seconds to show the success message, then close the form
+        setTimeout(() => {
           onClose();
-        })
-        .catch((error) => {
-          console.error('Error adding student:', error);
-          setErrors(prev => ({
-            ...prev,
-            form: 'Failed to add student. Please try again.'
-          }));
-        });
-    } else if (mode === 'edit' && student) {
-      updateStudent(student.studentId, submissionData)
-        .then(() => {
+        }, 1500);
+      } else if (mode === 'edit' && student) {
+        await updateStudent(student.studentId, submissionData);
+        setSuccessMessage('Student updated successfully!');
+        
+        // Wait for 1.5 seconds to show the success message, then close the form
+        setTimeout(() => {
           onClose();
-        })
-        .catch((error) => {
-          console.error('Error updating student:', error);
-          setErrors(prev => ({
-            ...prev,
-            form: 'Failed to update student. Please try again.'
-          }));
-        });
+        }, 1500);
+      }
+    } catch (error: unknown) {
+      console.error('Error submitting student:', error);
+      
+      // Check if it's a duplicate student ID error
+      const err = error as { 
+        response?: { 
+          status?: number; 
+          data?: { 
+            message?: string 
+          } 
+        } 
+      };
+      
+      if (err.response && err.response.status === 400 && 
+          err.response.data?.message === "Student ID already exists") {
+        setErrors(prev => ({
+          ...prev,
+          studentId: 'Student ID already exists',
+          form: 'A student with this ID already exists.'
+        }));
+        
+        // Call the callback to inform parent component about existing student
+        if (onExistingStudent) {
+          onExistingStudent(formData.studentId as string);
+        }
+      } else {
+        // Generic error
+        setErrors(prev => ({
+          ...prev,
+          form: err.response?.data?.message || 'Failed to submit student. Please try again.'
+        }));
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -303,16 +380,28 @@ const StudentForm: React.FC<StudentFormProps> = ({
   
   return (
     <form onSubmit={handleSubmit}>
+      {errors.form && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-600">
+          {errors.form}
+        </div>
+      )}
+      
+      {successMessage && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-600">
+          {successMessage}
+        </div>
+      )}
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {visibleFields.map(renderField)}
       </div>
       
       <div className="mt-6 flex justify-end space-x-3">
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button variant="primary" type="submit">
-          {mode === 'add' ? 'Add Student' : 'Update Student'}
+        <Button variant="primary" type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Saving...' : mode === 'add' ? 'Add Student' : 'Update Student'}
         </Button>
       </div>
     </form>

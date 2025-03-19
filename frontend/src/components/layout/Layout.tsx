@@ -6,9 +6,10 @@ import Sidebar from './Sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
+  title?: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children }) => {
+const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   const { isAuthenticated } = useAuthStore();
 
   if (!isAuthenticated) {
@@ -22,6 +23,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <Sidebar />
         <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
+            {title && (
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
+              </div>
+            )}
             {children}
           </div>
         </main>

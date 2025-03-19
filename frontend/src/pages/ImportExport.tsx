@@ -5,6 +5,7 @@ import Button from '../components/ui/Button';
 import { useStudentStore } from '../store/studentStore';
 import { studentsToExcel, downloadExcel } from '../utils/excelUtils';
 import * as XLSX from 'xlsx';
+import FileNamePrompt from '../components/ui/FileNamePrompt';
 
 const ImportExport: React.FC = () => {
   const studentStore = useStudentStore();
@@ -16,6 +17,8 @@ const ImportExport: React.FC = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [importMode, setImportMode] = useState<'combined' | 'new' | 'update'>('combined');
+  const [isFileNamePromptOpen, setIsFileNamePromptOpen] = useState(false);
+  const [exportData, setExportData] = useState<ArrayBuffer | null>(null);
   
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, mode: 'combined' | 'new' | 'update') => {
     const file = e.target.files?.[0];
@@ -88,91 +91,97 @@ const ImportExport: React.FC = () => {
     
     try {
       const excelData = studentsToExcel(studentStore.getAllStudents);
-      downloadExcel(excelData, 'students_export.xlsx');
+      setExportData(excelData);
+      setIsFileNamePromptOpen(true);
     } catch (err) {
       console.error('Error exporting to Excel:', err);
       alert('Failed to export students data');
     }
   };
   
+  const handleExportWithFilename = (filename: string) => {
+    if (!exportData) return;
+    
+    downloadExcel(exportData, `${filename}.xlsx`);
+    setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to ${filename}.xlsx`);
+  };
+  
   const handleDownloadTemplate = () => {
-    // Create a template with all required fields and a sample row
-    const templateData = [
-      {
-        'Sl No': '391',
-        'NAME': 'John Doe',
-        'STUDENT ID': '111111',
-        'PHONE NUMBER': '9876543210',
-        'GENDER': 'M',
-        'BATCH': '25TSRFIX',
-        'CLASS TEACHER': 'DEEPA.MD.(WB)',
-        'Hostel': 'DS',
-        'Stream': 'FOUNDATION',
-        'PROGRAM': 'FOUNDATION',
-        'Study Material': 'NOT RECEIVED',
-        'Uniform': 'RECEIVED',
-        'ID Card': 'NOT RECEIVED',
-        'Tab': 'REQUESTED NOT PAID',
-        'JOINED': 'ALLOTED',
-        'Syllabus': 'OTHER',
-        '% of +2 Marks': '89',
-        'NEET Score': '605',
-        'Remarks': 'REMARK 1',
-        'Remarks 1': 'REMARK 2',
-        'Remarks 2': '',
-        'Remarks 3': '',
-        'Remarks 4': '',
-        'Fee Due': '11300',
-        'Flag1': '1',
-        'Flag2': '',
-        'Flag3': '',
-        'Flag4': ''
-      },
-      {
-        'Sl No': '',
-        'NAME': '',
-        'STUDENT ID': '',
-        'PHONE NUMBER': '',
-        'GENDER': '',
-        'BATCH': '',
-        'CLASS TEACHER': '',
-        'Hostel': '',
-        'Stream': '',
-        'PROGRAM': '',
-        'Study Material': '',
-        'Uniform': '',
-        'ID Card': '',
-        'Tab': '',
-        'JOINED': '',
-        'Syllabus': '',
-        '% of +2 Marks': '',
-        'NEET Score': '',
-        'Remarks': '',
-        'Remarks 1': '',
-        'Remarks 2': '',
-        'Remarks 3': '',
-        'Remarks 4': '',
-        'Fee Due': '',
-        'Flag1': '',
-        'Flag2': '',
-        'Flag3': '',
-        'Flag4': ''
-      }
+    // Sample data for template
+    const sampleData = {
+      'Sl No': '1',
+      'NAME': 'John Doe',
+      'STUDENT ID': '12345',
+      'PHONE NUMBER': '9876543210',
+      'GENDER': 'M',
+      'BATCH': '25TSRFIX',
+      'CLASS TEACHER': 'DEEPA.MD.(WB)',
+      'Hostel': 'DS',
+      'Stream': 'FOUNDATION',
+      'PROGRAM': 'FOUNDATION',
+      'Study Material': 'NOT RECEIVED',
+      'Uniform': 'RECEIVED',
+      'ID Card': 'NOT RECEIVED',
+      'Tab': 'REQUESTED NOT PAID',
+      'JOINED': 'ALLOTED',
+      'Syllabus': 'STATE',
+      'Percentage of +2 Marks': '89',
+      'NEET Score': '605',
+      'Remarks': 'REMARK 1',
+      'Remarks 1': 'REMARK 2',
+      'Remarks 2': '',
+      'Remarks 3': '',
+      'Remarks 4': '',
+      'Fee Due': '11300',
+      'Flag1': '1',
+      'Flag2': '',
+      'Flag3': '',
+      'Flag4': ''
+    };
+    
+    // Create a workbook
+    const workbook = XLSX.utils.book_new();
+    
+    // Choose filename based on import mode
+    let fileName = 'student_template.xlsx';
+    if (importMode === 'new') {
+      fileName = 'new_students_template.xlsx';
+      sampleData['STUDENT ID'] = '12345 (must be new)';
+    } else if (importMode === 'update') {
+      fileName = 'update_students_template.xlsx';
+      sampleData['STUDENT ID'] = '12345 (must exist)';
+    }
+    
+    // Create a template with header row and one sample row
+    const templateData = [sampleData, {}];
+    
+    // Create worksheet
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
+    
+    // Create instructions worksheet
+    const instructions = [
+      { Field: 'NAME', Required: 'Yes', Description: 'Student full name' },
+      { Field: 'STUDENT ID', Required: 'Yes', Description: importMode === 'new' ? 'Must be new and unique' : importMode === 'update' ? 'Must already exist in system' : 'Unique identifier (updates if exists)' },
+      { Field: 'GENDER', Required: 'Yes', Description: 'M, F, or DIFFERENT' },
+      { Field: 'BATCH', Required: 'Yes', Description: 'Class batch' },
+      { Field: 'CLASS TEACHER', Required: 'Yes', Description: 'Teacher username' },
+      { Field: 'PHONE NUMBER', Required: 'No', Description: 'Contact number' },
+      { Field: 'Hostel', Required: 'No', Description: 'DS for Day Scholar or hostel name' },
+      { Field: 'Stream', Required: 'No', Description: 'MEDICAL, ENGINEERING, FOUNDATION' },
+      { Field: 'PROGRAM', Required: 'No', Description: 'FOUNDATION, EVENING, SPECIAL, etc.' }
     ];
     
-    // Convert to Excel and download
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Student Template');
+    const instructionSheet = XLSX.utils.json_to_sheet(instructions);
+    XLSX.utils.book_append_sheet(workbook, instructionSheet, 'Instructions');
     
     // Generate Excel file
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     
     // Download file
-    const fileName = 'student_template.xlsx';
-    
-    // Create a download link and trigger it
     const link = document.createElement('a');
     link.href = window.URL.createObjectURL(data);
     link.download = fileName;
@@ -416,6 +425,16 @@ const ImportExport: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Add the FileNamePrompt component */}
+      <FileNamePrompt
+        isOpen={isFileNamePromptOpen}
+        onClose={() => setIsFileNamePromptOpen(false)}
+        onConfirm={handleExportWithFilename}
+        defaultFileName={`students-export-${new Date().toISOString().slice(0, 10)}`}
+        title="Export Students"
+        fileType="Excel (.xlsx)"
+      />
     </Layout>
   );
 };

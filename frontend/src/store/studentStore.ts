@@ -11,7 +11,8 @@ import {
   uploadUpdateStudentsCSV,
   getStudentStats,
   getAllConfigs,
-  updateConfig
+  updateConfig,
+  findStudent,
 } from '../api';
 
 // Define a type for student stats
@@ -817,6 +818,15 @@ class StudentStore {
   get isDataLoaded() {
     return this.dataLoaded.get();
   }
+
+  findStudent = async (studentId: string): Promise<Student | null> => {
+    try {
+      return await findStudent(studentId);
+    } catch (error) {
+      console.error('Error finding student:', error);
+      throw error;
+    }
+  };
 }
 
 // Create a singleton instance

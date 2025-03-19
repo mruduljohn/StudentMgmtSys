@@ -17,6 +17,7 @@ import { Student } from '../types';
 import { studentsToExcel, downloadExcel } from '../utils/excelUtils';
 import PasswordConfirmModal from '../components/ui/PasswordConfirmModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import FileNamePrompt from '../components/ui/FileNamePrompt';
 
 // Define types for bulk actions and sort options
 // interface BulkAction {
@@ -97,12 +98,20 @@ const Students: React.FC = observer(() => {
   const [paginationKey, setPaginationKey] = useState(0);
   // Add a state variable to track filter changes
   const [filterKey, setFilterKey] = useState(0);
+  // Add states for success and error messages
+  const [successMessage, setSuccessMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  // Add states for file export
+  const [isFileNamePromptOpen, setIsFileNamePromptOpen] = useState(false);
+  const [exportData, setExportData] = useState<ArrayBuffer | null>(null);
+  const [exportType, setExportType] = useState<'all' | 'filtered' | 'selected'>('all');
+  const [exportDefaultFilename, setExportDefaultFilename] = useState('students');
   
-  // Create a custom name cell with a hyperlink - Define this function before it's used in useEffect
+  // Define the function to get a clickable name cell
   const getNameCell = (student: ExtendedStudent) => (
     <a 
       href="#" 
-      className="text-blue-600 hover:text-blue-800 hover:underline"
+      className="text-blue-600 hover:text-blue-800 font-medium"
       onClick={(e) => {
         e.preventDefault();
         handleEdit(student);
@@ -353,17 +362,6 @@ const Students: React.FC = observer(() => {
   
   const handleBulkEdit = () => {
     setIsBulkEditModalOpen(true);
-  };
-  
-  const handleExportSelected = () => {
-    const selectedStudents = studentStore.getStudents.filter(student => 
-      selectedRows.includes(student.studentId)
-    );
-    
-    if (selectedStudents.length > 0) {
-      const excelData = studentsToExcel(selectedStudents);
-      downloadExcel(excelData, `selected-students-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    }
   };
   
   const handleApplyFilters = (filters: FilterValue) => {
@@ -634,61 +632,43 @@ const Students: React.FC = observer(() => {
     );
   };
 
-  // Add a function to export all filtered students
-  const handleExportFiltered = async () => {
-    try {
-      // Show loading indicator or use a simple alert
-      alert("Preparing export... This may take a moment.");
-      
-      // Get the current filters, search, and sort parameters
-      const params: Record<string, string | number | boolean | undefined> = {
-        sortBy: studentStore.getSortField,
-        sortOrder: studentStore.getSortOrder,
-        search: studentStore.searchQuery.get(),
-      };
-      
-      // Add all filters to params
-      studentStore.filters.forEach((value, key) => {
-        if (value !== null && value !== undefined && value !== '') {
-          params[key] = value;
-        }
-      });
-      
-      console.log("Exporting students with params:", params);
-      
-      // Fetch all students matching the current filters (without pagination)
-      const allFilteredStudents = await studentStore.fetchAllFilteredStudents(params);
-      
-      if (allFilteredStudents.length === 0) {
-        alert("No students to export");
-        return;
-      }
-      
-      // Convert to Excel and download
-      const excelData = studentsToExcel(allFilteredStudents);
-      const filename = `students-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      
-      // Show success message with count
-      alert(`Exporting ${allFilteredStudents.length} students`);
-      
-      // Download the file
-      downloadExcel(excelData, filename);
-    } catch (error) {
-      console.error("Error exporting students:", error);
-      alert("Failed to export students. Please try again.");
-    }
-  };
-
   // Update the renderBulkActions function to include the export button
   const renderBulkActions = () => {
     const hasSelected = selectedRows.length > 0;
+    const allSelected = studentStore.getStudents.length > 0 && selectedRows.length === studentStore.getStudents.length;
     
     return (
-      <div className="flex items-center space-x-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Selection actions */}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            // Select all students in the current view
+            const allStudentIds = studentStore.getStudents.map(s => s.studentId);
+            setSelectedRows(allStudentIds);
+          }}
+          disabled={allSelected}
+          title="Select all filtered students"
+        >
+          Select All
+        </Button>
+        
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setSelectedRows([])}
+          disabled={!hasSelected}
+          title="Deselect all students"
+        >
+          Deselect All
+        </Button>
+
+        {/* Export actions */}
         <Button
           variant="primary"
           size="sm"
-          onClick={handleExportFiltered}
+          onClick={() => prepareExportData('filtered')}
           title="Export all filtered students"
         >
           <FileDown size={16} className="mr-1" />
@@ -700,7 +680,7 @@ const Students: React.FC = observer(() => {
             <Button
               variant="secondary"
               size="sm"
-              onClick={handleExportSelected}
+              onClick={() => prepareExportData('selected')}
               title="Export selected students"
             >
               <FileDown size={16} className="mr-1" />
@@ -721,14 +701,14 @@ const Students: React.FC = observer(() => {
               variant="danger"
               size="sm"
               onClick={handleBulkDelete}
-              disabled={!hasSelected}
+              disabled={!isAdmin || !hasSelected}
             >
               <Trash2 size={16} className="mr-1" />
               Delete ({selectedRows.length})
             </Button>
           </>
-          )}
-        </div>
+        )}
+      </div>
     );
   };
 
@@ -737,262 +717,366 @@ const Students: React.FC = observer(() => {
     studentStore.setSorting(field, order);
   };
 
-  // Add a function to export all students with current filters
-  // const handleExportAll = async () => {
-  //   try {
-  //     // Show loading message
-  //     alert("Preparing export... This may take a moment.");
+  // Function to show success message temporarily
+  const showSuccessMessage = (message: string) => {
+    setSuccessMessage(message);
+    // Clear the message after 3 seconds
+    setTimeout(() => {
+      setSuccessMessage('');
+    }, 3000);
+  };
+  
+  // Function to show error message temporarily
+  const showErrorMessage = (message: string) => {
+    setErrorMessage(message);
+    // Clear the message after 3 seconds
+    setTimeout(() => {
+      setErrorMessage('');
+    }, 3000);
+  };
+  
+  // Function to handle existing student
+  const handleExistingStudent = (studentId: string) => {
+    // Find the existing student
+    const existingStudent = studentStore.getStudents.find(s => s.studentId === studentId);
+    if (existingStudent) {
+      // Close the add modal
+      setIsAddModalOpen(false);
+      // Show an error message
+      showErrorMessage(`Student ID ${studentId} already exists.`);
       
-  //     // Get all students from the store
-  //     const allStudents = studentStore.getAllStudents;
-      
-  //     if (allStudents.length === 0) {
-  //       alert("No students to export");
-  //       return;
-  //     }
-      
-  //     // Convert to Excel and download
-  //     const excelData = studentsToExcel(allStudents);
-  //     const filename = `students-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      
-  //     // Download the file
-  //     downloadExcel(excelData, filename);
-      
-  //     // Show success message
-  //     alert(`Exported ${allStudents.length} students successfully`);
-  //   } catch (error) {
-  //     console.error("Error exporting students:", error);
-  //     alert("Failed to export students. Please try again.");
-  //   }
-  // };
+      // After a short delay, open the edit modal with the existing student
+      setTimeout(() => {
+        setSelectedStudent(existingStudent as ExtendedStudent);
+        setIsEditModalOpen(true);
+      }, 500);
+    }
+  };
+  
+  // Function to prepare export data
+  const prepareExportData = (type: 'all' | 'filtered' | 'selected'): void => {
+    setExportType(type);
+    let students: Student[] = [];
+    let defaultName = '';
+    
+    switch (type) {
+      case 'all':
+        students = studentStore.getAllStudents;
+        defaultName = `all-students-${new Date().toISOString().slice(0, 10)}`;
+        break;
+      case 'filtered':
+        students = studentStore.getStudents;
+        defaultName = `filtered-students-${new Date().toISOString().slice(0, 10)}`;
+        break;
+      case 'selected':
+        students = studentStore.getAllStudents.filter(student => 
+          selectedRows.includes(student.studentId)
+        );
+        defaultName = `selected-students-${new Date().toISOString().slice(0, 10)}`;
+        break;
+    }
+    
+    if (students.length === 0) {
+      showErrorMessage('No students to export');
+      return;
+    }
+    
+    const excelData = studentsToExcel(students);
+    setExportData(excelData);
+    setExportDefaultFilename(defaultName);
+    setIsFileNamePromptOpen(true);
+  };
+  
+  // Function to handle the export after filename is provided
+  const handleExportWithFilename = (filename: string): void => {
+    if (!exportData) return;
+    
+    downloadExcel(exportData, `${filename}.xlsx`);
+    showSuccessMessage(`Exported ${exportType === 'all' ? 'all' : exportType === 'filtered' ? 'filtered' : 'selected'} students successfully`);
+  };
   
   return (
-    <Layout>
-      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-        <h1 className="text-2xl font-bold text-gray-800">Students</h1>
+    <Layout title="Students">
+      <div className="flex flex-col h-full">
+        {/* Success and Error Messages */}
+        {successMessage && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-600">
+            {successMessage}
+          </div>
+        )}
+        {errorMessage && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-600">
+            {errorMessage}
+          </div>
+        )}
+        
+        <div className="mb-4 flex justify-between items-center">
           <p className="text-gray-600">
-            {studentStore.getTotalStudents > 0 ? `${studentStore.getTotalStudents} students found` : "No students found"}
+            {studentStore.getTotalStudents > 0 
+              ? `${studentStore.getTotalStudents} students found` 
+              : "No students found"}
           </p>
+          
+          {/* Add info about clicking on student names */}
+          <p className="text-sm text-gray-500 mt-1">
+            Click on a student's name to edit their information.
+          </p>
+          
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="primary"
+              onClick={() => setIsAddModalOpen(true)}
+              icon={<Plus size={16} />}
+            >
+              Add Student
+            </Button>
+            
+            <Button
+              variant="secondary"
+              onClick={() => setIsFilterModalOpen(true)}
+              icon={<Filter size={16} />}
+            >
+              Filter
+            </Button>
+            
+            <Button
+              variant="secondary"
+              onClick={() => {
+                // Export all students to Excel
+                prepareExportData('all');
+              }}
+              icon={<FileDown size={16} />}
+            >
+              Export
+            </Button>
+            
+            {/* Insert Sort Options component here conditionally */}
+            <div className="hidden">
+              {/* This keeps the sort functions in the codebase but doesn't display them */}
+              {renderSortOptions && renderSortOptions()}
+            </div>
+          </div>
         </div>
         
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="primary"
-            className="flex items-center"
-            onClick={() => setIsAddModalOpen(true)}
-          >
-            <Plus size={16} className="mr-1" />
-            Add Student
-          </Button>
-          
-          <Button
-            variant="secondary"
-            className="flex items-center"
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-          >
-            <Filter size={16} className="mr-1" />
-            Filter
-          </Button>
-          
-          {renderSortOptions()}
-          
-          {selectedRows.length > 0 && renderBulkActions()}
-        </div>
-      </div>
-      
-      {isFilterOpen && (
-        <div className="mb-6">
-          <FilterPanel
-            filters={filterOptions}
-            onApplyFilters={handleApplyFilters}
-            onResetFilters={() => {
-              studentStore.clearFilters();
-              // Increment filterKey to force a re-render
-              setFilterKey(prev => prev + 1);
-              studentStore.fetchStudents();
-            }}
-            isOpen={isFilterOpen}
-            onClose={() => setIsFilterOpen(false)}
-            initialValues={{}}
-          />
-        </div>
-      )}
-      
-      <div className="mb-6">
-        <AdvancedSearch
-          searchFields={searchFields}
-          onSearch={handleSearch}
-          initialQuery=""
+        {/* Display bulk action buttons when students are selected */}
+        {selectedRows.length > 0 && (
+          <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">
+              {selectedRows.length} students selected
+            </h3>
+            {renderBulkActions()}
+          </div>
+        )}
+        
+        {isFilterOpen && (
+          <div className="mb-6">
+            <FilterPanel
+              filters={filterOptions}
+              onApplyFilters={handleApplyFilters}
+              onResetFilters={() => {
+                studentStore.clearFilters();
+                // Increment filterKey to force a re-render
+                setFilterKey(prev => prev + 1);
+                studentStore.fetchStudents();
+              }}
+              isOpen={isFilterOpen}
+              onClose={() => setIsFilterOpen(false)}
+              initialValues={{}}
             />
           </div>
-      
-      {studentStore.isLoading ? (
-        <div className="flex justify-center items-center h-64">
-          <p className="text-gray-500">Loading students...</p>
-        </div>
-      ) : (
-        <>
-          {isMobile ? (
-            <MobileTable
-              columns={columns}
-              data={studentsWithPaymentStatus}
-              onRowClick={(student) => handleEdit(student as ExtendedStudent)}
-              priorityFields={['name', 'studentId', 'batch', 'classTeacher']}
+        )}
+        
+        <div className="mb-6">
+          <AdvancedSearch
+            searchFields={searchFields}
+            onSearch={handleSearch}
+            initialQuery=""
+              />
+            </div>
+        
+        {studentStore.isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <p className="text-gray-500">Loading students...</p>
+          </div>
+        ) : (
+          <>
+            {isMobile ? (
+              <MobileTable
+                columns={columns}
+                data={studentsWithPaymentStatus}
+                onRowClick={(student) => handleEdit(student as ExtendedStudent)}
+                priorityFields={['name', 'studentId', 'batch', 'classTeacher']}
+              />
+            ) : (
+          <Table
+            columns={columns}
+            data={studentsWithPaymentStatus}
+            isSelectable={true}
+            sortField={studentStore.getSortField}
+            sortOrder={studentStore.getSortOrder}
+            onSort={handleSort}
+          />
+            )}
+            
+            <div className="mt-4 flex justify-between items-center">
+              <div className="text-sm text-gray-500">
+                Showing {studentsWithPaymentStatus.length} of {studentStore.getTotalStudents} students
+              </div>
+              
+            <Pagination
+              currentPage={studentStore.getCurrentPage}
+              totalPages={studentStore.getTotalPages}
+              onPageChange={(page) => {
+                studentStore.setPage(page);
+                // Explicitly call fetchStudents to update the data
+                studentStore.fetchStudents();
+                // Increment paginationKey to force a re-render
+                setPaginationKey(prev => prev + 1);
+              }}
+              pageSize={studentStore.getPageSize}
+              totalItems={studentStore.getTotalStudents}
+              onPageSizeChange={(size) => {
+                studentStore.setPageSize(size);
+                // Explicitly call fetchStudents to update the data
+                studentStore.fetchStudents();
+                // Increment paginationKey to force a re-render
+                setPaginationKey(prev => prev + 1);
+              }}
+              pageSizeOptions={[50, 100, 200, 500]}
             />
-          ) : (
-        <Table
-          columns={columns}
-          data={studentsWithPaymentStatus}
-              onRowClick={(student) => handleEdit(student as ExtendedStudent)}
-              isSelectable={isAdmin}
-              sortField={studentStore.getSortField}
-              sortOrder={studentStore.getSortOrder}
-              onSort={handleSort}
+          </div>
+          </>
+        )}
+        
+        {/* Add Student Modal */}
+        <Modal
+          title="Add Student"
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          size="xl"
+        >
+          <StudentForm
+            mode="add"
+            onClose={() => {
+              setIsAddModalOpen(false);
+              // Refresh the student list after adding
+              studentStore.fetchStudents();
+              // Show success message
+              showSuccessMessage('Student added successfully!');
+            }}
+            onExistingStudent={handleExistingStudent}
+          />
+        </Modal>
+        
+        {/* Edit Student Modal */}
+        <Modal
+          title={`Edit Student: ${selectedStudent?.name && typeof selectedStudent.name === 'string' ? selectedStudent.name : ''}`}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          size="xl"
+        >
+          {selectedStudent && (
+            <StudentForm
+              student={selectedStudent as Student}
+              mode="edit"
+              onClose={() => {
+                setIsEditModalOpen(false);
+                // Refresh the student list after editing
+                studentStore.fetchStudents();
+                // Show success message
+                showSuccessMessage('Student updated successfully!');
+              }}
             />
           )}
-          
-          <div className="mt-4 flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              Showing {studentsWithPaymentStatus.length} of {studentStore.getTotalStudents} students
+        </Modal>
+        
+        {/* Bulk Edit Modal */}
+        <Modal
+          isOpen={isBulkEditModalOpen}
+          onClose={() => setIsBulkEditModalOpen(false)}
+          title={`Edit ${selectedRows.length} Students`}
+          size="lg"
+        >
+          <div className="p-4">
+            <p className="mb-4">
+              Bulk edit functionality will be implemented here. You can update common fields for all selected students.
+            </p>
+            <div className="flex justify-end">
+              <Button
+                variant="secondary"
+                onClick={() => setIsBulkEditModalOpen(false)}
+              >
+                Close
+              </Button>
             </div>
-            
-          <Pagination
-            currentPage={studentStore.getCurrentPage}
-            totalPages={studentStore.getTotalPages}
-            onPageChange={(page) => {
-              studentStore.setPage(page);
-              // Explicitly call fetchStudents to update the data
-              studentStore.fetchStudents();
-              // Increment paginationKey to force a re-render
-              setPaginationKey(prev => prev + 1);
-            }}
-            pageSize={studentStore.getPageSize}
-            totalItems={studentStore.getTotalStudents}
-            onPageSizeChange={(size) => {
-              studentStore.setPageSize(size);
-              // Explicitly call fetchStudents to update the data
-              studentStore.fetchStudents();
-              // Increment paginationKey to force a re-render
-              setPaginationKey(prev => prev + 1);
-            }}
-            pageSizeOptions={[50, 100, 200, 500]}
-          />
-        </div>
-        </>
-      )}
-      
-      {/* Add Student Modal */}
-      <Modal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        title="Add New Student"
-        size="lg"
-      >
-        <StudentForm
-          onClose={() => {
-            setIsAddModalOpen(false);
-            studentStore.fetchStudents(); // Refresh the student list after adding
+          </div>
+        </Modal>
+        
+        {/* Password Confirmation Modal */}
+        <PasswordConfirmModal
+          isOpen={isPasswordModalOpen}
+          onClose={() => setIsPasswordModalOpen(false)}
+          onConfirm={() => {
+            if (deleteAction === 'single') {
+              setIsDeleteModalOpen(true);
+            } else {
+              confirmBulkDelete();
+            }
           }}
-          mode="add"
+          title="Confirm Delete"
+          message={deleteAction === 'single' 
+            ? `To delete student ${selectedStudent?.name}, please type CONFIRMDELETE below.` 
+            : `To delete ${selectedRows.length} students, please type CONFIRMDELETE below.`}
         />
-      </Modal>
-      
-      {/* Edit Student Modal */}
-      <Modal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        title={`Edit Student: ${typeof selectedStudent?.name === 'string' ? selectedStudent?.name : 'Student'}`}
-        size="lg"
-      >
-        {selectedStudent && (
-          <StudentForm
-            student={selectedStudent as unknown as Student}
-            onClose={() => {
-              setIsEditModalOpen(false);
-              studentStore.fetchStudents(); // Refresh the student list after editing
-            }}
-            mode="edit"
-          />
-        )}
-      </Modal>
-      
-      {/* Bulk Edit Modal */}
-      <Modal
-        isOpen={isBulkEditModalOpen}
-        onClose={() => setIsBulkEditModalOpen(false)}
-        title={`Edit ${selectedRows.length} Students`}
-        size="lg"
-      >
-        <div className="p-4">
-          <p className="mb-4">
-            Bulk edit functionality will be implemented here. You can update common fields for all selected students.
-          </p>
-          <div className="flex justify-end">
-            <Button
-              variant="secondary"
-              onClick={() => setIsBulkEditModalOpen(false)}
-            >
-              Close
-            </Button>
+        
+        {/* Delete Confirmation Modal */}
+        <Modal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          title="Confirm Delete"
+          size="sm"
+        >
+          <div className="text-center">
+            <p className="mb-4">
+              Are you sure you want to delete student{' '}
+              <span className="font-semibold">{selectedStudent?.name}</span>?
+            </p>
+            <p className="mb-6 text-red-600 text-sm">
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-center space-x-4">
+              <Button
+                variant="secondary"
+                onClick={() => setIsDeleteModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={confirmDelete}>
+                Delete
+              </Button>
+            </div>
           </div>
-        </div>
-      </Modal>
-      
-      {/* Password Confirmation Modal */}
-      <PasswordConfirmModal
-        isOpen={isPasswordModalOpen}
-        onClose={() => setIsPasswordModalOpen(false)}
-        onConfirm={() => {
-          if (deleteAction === 'single') {
-            setIsDeleteModalOpen(true);
-          } else {
-            confirmBulkDelete();
-          }
-        }}
-        title="Confirm Delete"
-        message={deleteAction === 'single' 
-          ? `To delete student ${selectedStudent?.name}, please type CONFIRMDELETE below.` 
-          : `To delete ${selectedRows.length} students, please type CONFIRMDELETE below.`}
-      />
-      
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="Confirm Delete"
-        size="sm"
-      >
-        <div className="text-center">
-          <p className="mb-4">
-            Are you sure you want to delete student{' '}
-            <span className="font-semibold">{selectedStudent?.name}</span>?
-          </p>
-          <p className="mb-6 text-red-600 text-sm">
-            This action cannot be undone.
-          </p>
-          <div className="flex justify-center space-x-4">
-            <Button
-              variant="secondary"
-              onClick={() => setIsDeleteModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={confirmDelete}>
-              Delete
-            </Button>
-          </div>
-        </div>
-      </Modal>
-      
-      {/* Filter Modal */}
-      <FilterPanel
-        isOpen={isFilterModalOpen}
-        onClose={() => setIsFilterModalOpen(false)}
-        filters={filterOptions}
-        onApplyFilters={handleApplyFilters}
-        onResetFilters={studentStore.clearFilters}
-      />
+        </Modal>
+        
+        {/* Filter Modal */}
+        <FilterPanel
+          isOpen={isFilterModalOpen}
+          onClose={() => setIsFilterModalOpen(false)}
+          filters={filterOptions}
+          onApplyFilters={handleApplyFilters}
+          onResetFilters={studentStore.clearFilters}
+        />
+        
+        {/* File Name Prompt */}
+        <FileNamePrompt
+          isOpen={isFileNamePromptOpen}
+          onClose={() => setIsFileNamePromptOpen(false)}
+          onConfirm={handleExportWithFilename}
+          defaultFileName={exportDefaultFilename}
+          title="Export Students"
+          fileType="Excel (.xlsx)"
+        />
+      </div>
     </Layout>
   );
 });

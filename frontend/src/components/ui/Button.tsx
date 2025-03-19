@@ -5,6 +5,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: 'sm' | 'md' | 'lg';
   fullWidth?: boolean;
   children: React.ReactNode;
+  icon?: React.ReactNode;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -12,6 +13,7 @@ const Button: React.FC<ButtonProps> = ({
   size = 'md',
   fullWidth = false,
   children,
+  icon,
   className = '',
   ...props
 }) => {
@@ -37,6 +39,7 @@ const Button: React.FC<ButtonProps> = ({
   
   return (
     <button className={classes} {...props}>
+      {icon && <span className="mr-2">{icon}</span>}
       {children}
     </button>
   );

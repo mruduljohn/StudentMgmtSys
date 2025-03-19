@@ -9,7 +9,8 @@ import {
   uploadCSV,
   getStudentStats,
   uploadNewStudentsCSV,
-  uploadUpdateStudentsCSV
+  uploadUpdateStudentsCSV,
+  findStudent
 } from "../controllers/student.controller";
 import { authMiddleware, adminOnly, mentorOrAdmin } from "../middlewares/auth.middleware";
 
@@ -220,5 +221,27 @@ router.post(
  *         description: Student statistics
  */
 router.get("/students/stats", authMiddleware, getStudentStats);
+
+/**
+ * @swagger
+ * /students/find/{studentId}:
+ *   get:
+ *     summary: Find a student by ID
+ *     tags: [Students]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: studentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Student details
+ *       404:
+ *         description: Student not found
+ */
+router.get('/find/:studentId', authMiddleware, findStudent);
 
 export default router;

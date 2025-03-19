@@ -399,3 +399,14 @@ export const initializeDefaultSubjectChapters = async () => {
     throw error;
   }
 };
+
+// Function to find a student by ID
+export const findStudent = async (studentId: string) => {
+  try {
+    const response = await api.get(`/students/find/${studentId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error finding student:', error);
+    throw error;
+  }
+};
