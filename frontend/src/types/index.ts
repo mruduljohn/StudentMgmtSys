@@ -164,3 +164,7 @@ export interface FlagsConfig {
   flag3: string;
   flag4: string;
 }
+
+export interface SubjectChaptersConfig {
+  [subject: string]: string[];
+}

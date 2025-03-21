@@ -7,12 +7,8 @@ import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
 import { useStudentStore } from '../store/studentStore';
 import { BatchConfig, RemarksConfig, FlagsConfig } from '../types';
-import { 
-  getSubjectChapters, 
-  updateSubjectChapters, 
-  initializeDefaultSubjectChapters
-} from '../api';
 import { toast, Toaster } from 'react-hot-toast';
+import { useAuthStore } from '../store/authStore';
 
 const Settings: React.FC = () => {
   const { 
@@ -21,8 +17,15 @@ const Settings: React.FC = () => {
     flagsConfig,
     updateBatchConfig,
     updateRemarksConfig,
-    updateFlagsConfig
+    updateFlagsConfig,
+    fetchSubjectChapters,
+    updateSubjectChapters,
+    initializeDefaultSubjectChapters,
+    getSubjectChapters,
   } = useStudentStore();
+  
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'ADMIN';
   
   const [batchSettings, setBatchSettings] = useState<BatchConfig>({ ...batchConfig });
   const [remarksSettings, setRemarksSettings] = useState<RemarksConfig>({ ...remarksConfig });
@@ -64,40 +67,94 @@ const Settings: React.FC = () => {
   
   const predefinedSubjects = ['PHYSICS', 'CHEMISTRY', 'BOTANY', 'ZOOLOGY', 'MATHS'];
   
+  // Effect to handle config changes
   useEffect(() => {
     setBatchSettings({ ...batchConfig });
     setRemarksSettings({ ...remarksConfig });
     setFlagsSettings({ ...flagsConfig });
-    fetchSubjectChapters();
   }, [batchConfig, remarksConfig, flagsConfig]);
   
-  const fetchSubjectChapters = async () => {
+  // Effect to load subject chapters once when component mounts
+  useEffect(() => {
+    const loadSubjectChapters = async () => {
+      try {
+        setChaptersLoading(true);
+        await fetchSubjectChapters();
+        const chapters = getSubjectChapters;
+        
+        if (!chapters || Object.keys(chapters).length === 0) {
+          console.log('No subject chapters found in the database');
+          setSubjectChapters({});
+          if (isAdmin) {
+            toast.error('No subject chapters found. Please click "Initialize Default Chapters" to create them.');
+          } else {
+            toast.error('No subject chapters found. Please contact an administrator.');
+          }
+        } else {
+          setSubjectChapters(chapters);
+          
+          // Set the first subject as selected if none is selected
+          if ((!selectedSubject || selectedSubject === 'PHYSICS') && Object.keys(chapters).length > 0) {
+            const firstSubject = Object.keys(chapters)[0];
+            setSelectedSubject(firstSubject);
+            setChapterText((chapters[firstSubject] || []).join('\n'));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching subject chapters:', error);
+        setSubjectChapters({});
+        toast.error('Failed to load subject chapters');
+      } finally {
+        setChaptersLoading(false);
+      }
+    };
+    
+    loadSubjectChapters();
+  }, []);
+  
+  // Effect to update chapter text when selected subject changes
+  useEffect(() => {
+    if (selectedSubject && subjectChapters[selectedSubject]) {
+      setChapterText(subjectChapters[selectedSubject].join('\n'));
+    } else if (selectedSubject && !subjectChapters[selectedSubject]) {
+      // If subject is selected but no chapters exist for it
+      setChapterText('');
+    }
+  }, [selectedSubject, subjectChapters]);
+  
+  const fetchAndLoadSubjectChapters = async () => {
     try {
       setChaptersLoading(true);
-      const chapters = await getSubjectChapters();
-      setSubjectChapters(chapters || {});
+      // Fetch chapters from the API
+      await fetchSubjectChapters();
+      // Get the updated chapters from the store
+      const chapters = getSubjectChapters;
       
-      // Set the first subject as selected if none is selected
-      if (!selectedSubject && Object.keys(chapters || {}).length > 0) {
-        setSelectedSubject(Object.keys(chapters)[0]);
-        setChapterText((chapters[Object.keys(chapters)[0]] || []).join('\n'));
+      if (!chapters || Object.keys(chapters).length === 0) {
+        console.log('No subject chapters found in the database');
+        setSubjectChapters({});
+        if (isAdmin) {
+          toast.error('No subject chapters found. Please click "Initialize Default Chapters" to create them.');
+        } else {
+          toast.error('No subject chapters found. Please contact an administrator.');
+        }
+      } else {
+        // Update the local state with the fetched chapters
+        setSubjectChapters(chapters);
+        
+        // Ensure selected subject is valid and update chapter text
+        if (selectedSubject && chapters[selectedSubject]) {
+          setChapterText(chapters[selectedSubject].join('\n'));
+        } else if (Object.keys(chapters).length > 0) {
+          const firstSubject = Object.keys(chapters)[0];
+          setSelectedSubject(firstSubject);
+          setChapterText((chapters[firstSubject] || []).join('\n'));
+        }
       }
     } catch (error) {
       console.error('Error fetching subject chapters:', error);
-      try {
-        // Try to initialize default chapters if none exist
-        await initializeDefaultSubjectChapters();
-        const chapters = await getSubjectChapters();
-        setSubjectChapters(chapters || {});
-        
-        if (!selectedSubject && Object.keys(chapters || {}).length > 0) {
-          setSelectedSubject(Object.keys(chapters)[0]);
-          setChapterText((chapters[Object.keys(chapters)[0]] || []).join('\n'));
-        }
-      } catch (initError) {
-        console.error('Error initializing subject chapters:', initError);
-        toast.error('Failed to load subject chapters');
-      }
+      setSubjectChapters({});
+      toast.error('Failed to load subject chapters');
     } finally {
       setChaptersLoading(false);
     }
@@ -120,39 +177,54 @@ const Settings: React.FC = () => {
   };
   
   const saveSubjectChapters = async () => {
-    if (!selectedSubject) return;
+    // Don't proceed if already loading
+    if (chaptersLoading) {
+      return;
+    }
+    
+    if (!selectedSubject) {
+      toast.error('Please select a subject');
+      return;
+    }
+    
+    if (!chapterText.trim()) {
+      toast.error('Please provide at least one chapter');
+      return;
+    }
     
     try {
       setChaptersLoading(true);
-      setSaveSuccess(false);
-      setSaveError(false);
       
-      // Parse chapters from text area
-      const chapters = chapterText.split('\n')
+      // Parse the text area content into an array of chapters
+      const chapters = chapterText
+        .split('\n')
         .map(line => line.trim())
-        .filter(line => line !== '');
+        .filter(line => line.length > 0);
       
-      await updateSubjectChapters(selectedSubject, chapters);
+      if (chapters.length === 0) {
+        toast.error('Please provide at least one chapter');
+        return;
+      }
       
-      // Update local state
-      setSubjectChapters(prev => ({
-        ...prev,
-        [selectedSubject]: chapters
-      }));
+      // Update chapters for the selected subject
+      const success = await updateSubjectChapters(selectedSubject, chapters);
       
-      setSaveSuccess(true);
-      toast.success('Subject chapters saved successfully');
+      if (success) {
+        // Update local state with the new chapters
+        setSubjectChapters({
+          ...subjectChapters,
+          [selectedSubject]: chapters
+        });
+        
+        toast.success(`Chapters for ${selectedSubject} saved successfully`);
+      } else {
+        toast.error('Failed to save chapters');
+      }
     } catch (error) {
-      console.error('Error saving subject chapters:', error);
-      setSaveError(true);
-      toast.error('Failed to save subject chapters');
+      console.error('Error saving chapters:', error);
+      toast.error('Failed to save chapters');
     } finally {
       setChaptersLoading(false);
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSaveSuccess(false);
-      }, 3000);
     }
   };
   
@@ -255,19 +327,25 @@ const Settings: React.FC = () => {
     }));
   };
   
-  // const handleInitializeDefaults = async () => {
-  //   try {
-  //     await initializeDefaultConfigs();
-  //     // Refresh the store
-  //     await fetchAllConfigs();
-  //     setSaveSuccess(true);
-  //     setTimeout(() => setSaveSuccess(false), 3000);
-  //   } catch (error) {
-  //     console.error('Error initializing defaults:', error);
-  //     setSaveError(true);
-  //     setTimeout(() => setSaveError(false), 3000);
-  //   }
-  // };
+  const handleInitializeSubjectChapters = async () => {
+    try {
+      setChaptersLoading(true);
+      const result = await initializeDefaultSubjectChapters();
+      
+      if (result) {
+        toast.success('Default subject chapters initialized successfully');
+        // Fetch the updated chapters
+        await fetchAndLoadSubjectChapters();
+      } else {
+        toast.error('Failed to initialize default subject chapters');
+      }
+    } catch (error) {
+      console.error('Error initializing default subject chapters:', error);
+      toast.error('Failed to initialize default subject chapters');
+    } finally {
+      setChaptersLoading(false);
+    }
+  };
   
   return (
     <Layout>
@@ -404,6 +482,25 @@ const Settings: React.FC = () => {
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-lg font-semibold mb-4">Subject Chapters Configuration</h2>
             
+            {Object.keys(subjectChapters).length === 0 && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                <p className="text-yellow-800 text-sm">
+                  No subject chapters found in the database. Please initialize the default chapters.
+                </p>
+              </div>
+            )}
+            
+            {chaptersLoading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <div className="mb-2">
+                    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+                  </div>
+                  <p className="text-gray-600 text-sm">Loading subject chapters...</p>
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -417,6 +514,19 @@ const Settings: React.FC = () => {
                     : predefinedSubjects}
                   fullWidth
                 />
+                
+                <div className="mt-2">
+                  {isAdmin && (
+                    <Button
+                      variant="secondary"
+                      onClick={handleInitializeSubjectChapters}
+                      disabled={chaptersLoading}
+                      className="mr-2"
+                    >
+                      {chaptersLoading ? 'Initializing...' : 'Initialize Default Chapters'}
+                    </Button>
+                  )}
+                </div>
               </div>
               
               <div>

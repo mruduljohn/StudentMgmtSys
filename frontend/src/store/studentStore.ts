@@ -1,5 +1,5 @@
 import { makeAutoObservable, runInAction, observable, action } from 'mobx';
-import { Student, BatchConfig, RemarksConfig, FlagsConfig } from '../types';
+import { Student, BatchConfig, RemarksConfig, FlagsConfig, SubjectChaptersConfig } from '../types';
 import { 
   fetchStudents, 
   getStudentById, 
@@ -13,6 +13,9 @@ import {
   getAllConfigs,
   updateConfig,
   findStudent,
+  getSubjectChapters,
+  updateSubjectChapters,
+  initializeDefaultSubjectChapters,
 } from '../api';
 
 // Define a type for student stats
@@ -84,6 +87,8 @@ class StudentStore {
     flag3: 'Flag 3',
     flag4: 'Flag 4',
   });
+  
+  subjectChaptersConfig = observable<SubjectChaptersConfig>({});
 
   constructor() {
     makeAutoObservable(this);
@@ -600,6 +605,14 @@ class StudentStore {
           this.flagsConfig = response.flagsConfig;
         }
       });
+
+      try {
+        // Fetch subject chapters separately
+        await this.fetchSubjectChapters();
+      } catch (error) {
+        console.error('Error fetching subject chapters:', error);
+        // Continue with the other config data
+      }
       
       return response;
     } catch (error) {
@@ -693,6 +706,76 @@ class StudentStore {
       console.error('Error updating flags config:', error);
       runInAction(() => {
         this.error.set('Failed to update flags configuration');
+        this.loading.set(false);
+      });
+      return false;
+    }
+  });
+
+  fetchSubjectChapters = action(async () => {
+    try {
+      this.loading.set(true);
+      const chapters = await getSubjectChapters();
+      
+      runInAction(() => {
+        this.subjectChaptersConfig = chapters || {};
+        this.loading.set(false);
+      });
+      
+      return chapters;
+    } catch (error) {
+      console.error('Error fetching subject chapters:', error);
+      runInAction(() => {
+        this.error.set('Failed to fetch subject chapters');
+        this.loading.set(false);
+      });
+      throw error;
+    }
+  });
+
+  updateSubjectChapters = action(async (subject: string, chapters: string[]) => {
+    try {
+      this.loading.set(true);
+      
+      // Update subject chapters on the server
+      await updateSubjectChapters(subject, chapters);
+      
+      // Update local state
+      runInAction(() => {
+        this.subjectChaptersConfig = {
+          ...this.subjectChaptersConfig,
+          [subject]: chapters
+        };
+        this.loading.set(false);
+      });
+      
+      return true;
+    } catch (error) {
+      console.error(`Error updating chapters for ${subject}:`, error);
+      runInAction(() => {
+        this.error.set('Failed to update subject chapters');
+        this.loading.set(false);
+      });
+      return false;
+    }
+  });
+
+  initializeDefaultSubjectChapters = action(async () => {
+    try {
+      this.loading.set(true);
+      
+      // Initialize default subject chapters on the server
+      const result = await initializeDefaultSubjectChapters();
+      
+      // Fetch the updated subject chapters
+      await this.fetchSubjectChapters();
+      
+      this.loading.set(false);
+      return result;
+    } catch (error) {
+      console.error('Error initializing default subject chapters:', error);
+      runInAction(() => {
+        this.error.set('Failed to initialize default subject chapters');
         this.loading.set(false);
       });
       return false;
@@ -817,6 +900,10 @@ class StudentStore {
 
   get isDataLoaded() {
     return this.dataLoaded.get();
+  }
+
+  get getSubjectChapters(): SubjectChaptersConfig {
+    return this.subjectChaptersConfig;
   }
 
   findStudent = async (studentId: string): Promise<Student | null> => {
