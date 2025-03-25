@@ -17,7 +17,8 @@ const configSchema = new mongoose.Schema(
         "tabs",
         "joinedStatuses",
         "syllabuses",
-        "subjectChapters"
+        "subjectChapters",
+        "backupSchedule"
       ],
       unique: true,
       index: true

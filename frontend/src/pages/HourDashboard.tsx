@@ -42,6 +42,7 @@ const HourDashboard: React.FC = observer(() => {
   const [selectedMode, setSelectedMode] = useState<string>('');
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [chapterSearchQuery, setChapterSearchQuery] = useState<string>('');
 
   useEffect(() => {
     // Initialize the store when component mounts
@@ -103,6 +104,18 @@ const HourDashboard: React.FC = observer(() => {
     // Update filters based on the selected status
     if (tabValue === 0) {
       hourStore.setFilter('chapterStatus', status);
+    }
+  };
+  
+  const handleChapterSearch = (query: string) => {
+    setChapterSearchQuery(query);
+    
+    // Update search in store
+    if (tabValue === 0) {
+      // If the search query is at least 2 characters or empty, update the filter
+      if (query.length >= 2 || query === '') {
+        hourStore.setFilter('chapter', query);
+      }
     }
   };
 
@@ -177,11 +190,13 @@ const HourDashboard: React.FC = observer(() => {
             selectedMode={selectedMode}
             selectedTeacher={selectedTeacher}
             selectedStatus={selectedStatus}
+            chapterSearchQuery={chapterSearchQuery}
             onBatchChange={handleBatchChange}
             onSubjectChange={handleSubjectChange}
             onModeChange={handleModeChange}
             onTeacherChange={handleTeacherChange}
             onStatusChange={handleStatusChange}
+            onChapterSearch={handleChapterSearch}
           />
         </div>
         

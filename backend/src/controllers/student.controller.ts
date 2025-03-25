@@ -6,6 +6,9 @@ import fs from "fs";
 import { parse } from "csv-parse";
 import { Multer } from "multer";
 
+// Import our new file parser utility
+import { parseFile } from "../utils/fileParser";
+
 // Define interface for Request with file
 interface RequestWithFile extends Request {
   file?: Express.Multer.File;
@@ -481,7 +484,7 @@ const mapCSVColumnToModelField = (columnName: string): string | null => {
   return mapping[columnName] || null;
 };
 
-// Upload CSV file
+// Upload CSV or Excel file
 export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<void> => {
   try {
     if (!req.file) {
@@ -489,9 +492,9 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
       return;
     }
     
-    // Only ADMIN can upload CSV
+    // Only ADMIN can upload files
     if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ message: "Only administrators can upload CSV files" });
+      res.status(403).json({ message: "Only administrators can upload files" });
       return;
     }
     
@@ -519,18 +522,17 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
     const joinedStatusValues = ["ALLOTED", "DISCONTINUED", "JOINED", "NOT JOINING", "CENTRE CHANGE"];
     const syllabusValues = ["STATE", "CBSE", "ICSE", "OTHER"];
     
-    // Parse CSV file
-    const parser = fs
-      .createReadStream(filePath)
-      .pipe(parse({
-        columns: true,
-        skip_empty_lines: true,
-        trim: true
-      }));
+    // Parse file using our utility
+    const records = await parseFile(filePath);
     
-    for await (const record of parser) {
+    // Create an error log file
+    const errorLogPath = `src/uploads/error_log_${Date.now()}.json`;
+    let lineNumber = 1;
+    
+    for (const record of records) {
+      lineNumber++;
       try {
-        // Map CSV columns to student model fields with proper type conversions
+        // Map columns to student model fields with proper type conversions
         const studentData = {
           slNo: safeToNumber(record['Sl No']),
           name: safeToString(record['NAME']),
@@ -571,20 +573,56 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
         const existingStudent = await Student.findOne({ studentId: studentData.studentId });
         
         if (existingStudent) {
-          // Create an update object with only the fields that are present in the CSV
+          // Create an update object with only the fields that are present in the file
           const updateData: Record<string, any> = {};
           
-          // Iterate through the record object to check which fields are present in the CSV
+          // Iterate through the record object to check which fields are present
           for (const key in record) {
             const mappedKey = mapCSVColumnToModelField(key);
             if (mappedKey && record[key] !== undefined && record[key] !== '') {
-              // Only include fields that have values in the CSV
+              // Only include fields that have values
               updateData[mappedKey] = studentData[mappedKey as keyof typeof studentData];
             }
           }
           
-          // Update existing student with only the fields from the CSV
+          // Track if class teacher is changing
+          const oldClassTeacher = existingStudent.classTeacher;
+          const newClassTeacher = studentData.classTeacher;
+          
+          // Update existing student with only the fields from the file
           await Student.findByIdAndUpdate(existingStudent._id, updateData);
+          
+          // If class teacher changed, update mentor assignments
+          if (oldClassTeacher !== newClassTeacher) {
+            // If there was a previous teacher, remove student from their list
+            if (oldClassTeacher) {
+              const oldMentor = await User.findOne({ 
+                name: oldClassTeacher,
+                role: "MENTOR"
+              });
+              
+              if (oldMentor) {
+                await User.findByIdAndUpdate(oldMentor._id, {
+                  $pull: { assignedStudents: existingStudent._id }
+                });
+              }
+            }
+            
+            // If there's a new teacher, add student to their list
+            if (newClassTeacher) {
+              const newMentor = await User.findOne({ 
+                name: newClassTeacher,
+                role: "MENTOR"
+              });
+              
+              if (newMentor) {
+                await User.findByIdAndUpdate(newMentor._id, {
+                  $addToSet: { assignedStudents: existingStudent._id }
+                });
+              }
+            }
+          }
+          
           results.push({ 
             studentId: studentData.studentId, 
             name: studentData.name, 
@@ -615,12 +653,18 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
           });
         }
       } catch (error) {
-        console.error("Error processing CSV record:", error);
+        console.error("Error processing record:", error);
         errors.push({ 
           record, 
-          error: (error as Error).message 
+          error: (error as Error).message,
+          line: lineNumber
         });
       }
+    }
+    
+    // Write errors to log file if there are any
+    if (errors.length > 0) {
+      fs.writeFileSync(errorLogPath, JSON.stringify(errors, null, 2));
     }
     
     // Clean up the temporary file
@@ -630,7 +674,7 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
     const createdCount = results.filter(r => r.status === 'created').length;
     const updatedCount = results.filter(r => r.status === 'updated').length;
     
-    // Log CSV upload
+    // Log file upload
     await Audit.create({
       user: req.user?.id,
       action: "UPLOAD",
@@ -646,7 +690,7 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
     });
     
     res.json({
-      message: "CSV processed successfully",
+      message: "File processed successfully",
       results: {
         total: results.length + errors.length,
         successful: results.length,
@@ -655,10 +699,11 @@ export const uploadCSV = async (req: RequestWithFile, res: Response): Promise<vo
       details: {
         created: createdCount,
         updated: updatedCount
-      }
+      },
+      errorLog: errors.length > 0 ? errorLogPath : null
     });
   } catch (error) {
-    console.error("Error uploading CSV:", error);
+    console.error("Error uploading file:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -737,7 +782,7 @@ export const getStudentStats = async (req: Request, res: Response): Promise<void
   }
 };
 
-// Upload CSV file for new students only
+// Upload file for new students only
 export const uploadNewStudentsCSV = async (req: RequestWithFile, res: Response): Promise<void> => {
   try {
     if (!req.file) {
@@ -745,9 +790,9 @@ export const uploadNewStudentsCSV = async (req: RequestWithFile, res: Response):
       return;
     }
     
-    // Only ADMIN can upload CSV
+    // Only ADMIN can upload files
     if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ message: "Only administrators can upload CSV files" });
+      res.status(403).json({ message: "Only administrators can upload files" });
       return;
     }
     
@@ -764,21 +809,17 @@ export const uploadNewStudentsCSV = async (req: RequestWithFile, res: Response):
     const joinedStatusValues = ["ALLOTED", "DISCONTINUED", "JOINED", "NOT JOINING", "CENTRE CHANGE"];
     const syllabusValues = ["STATE", "CBSE", "ICSE", "OTHER"];
     
-    // Parse CSV file
-    const parser = fs
-      .createReadStream(filePath)
-      .pipe(parse({
-        columns: true,
-        skip_empty_lines: true,
-        trim: true
-      }));
+    // Parse file using our utility
+    const records = await parseFile(filePath);
     
     // Create an error log file
     const errorLogPath = `src/uploads/error_log_${Date.now()}.json`;
+    let lineNumber = 1;
     
-    for await (const record of parser) {
+    for (const record of records) {
+      lineNumber++;
       try {
-        // Map CSV columns to student model fields with proper type conversions
+        // Map columns to student model fields with proper type conversions
         const studentData = {
           slNo: safeToNumber(record['Sl No']),
           name: safeToString(record['NAME']),
@@ -845,11 +886,11 @@ export const uploadNewStudentsCSV = async (req: RequestWithFile, res: Response):
           });
         }
       } catch (error) {
-        console.error("Error processing CSV record:", error);
+        console.error("Error processing record:", error);
         errors.push({ 
           record, 
           error: (error as Error).message,
-          line: parser.info.lines
+          line: lineNumber
         });
       }
     }
@@ -862,7 +903,7 @@ export const uploadNewStudentsCSV = async (req: RequestWithFile, res: Response):
     // Clean up the temporary file
     fs.unlinkSync(filePath);
     
-    // Log CSV upload
+    // Log file upload
     await Audit.create({
       user: req.user?.id,
       action: "UPLOAD_NEW",
@@ -878,7 +919,7 @@ export const uploadNewStudentsCSV = async (req: RequestWithFile, res: Response):
     });
     
     res.json({
-      message: "CSV processed successfully",
+      message: "File processed successfully",
       results: {
         total: results.length + errors.length,
         successful: results.length,
@@ -890,12 +931,12 @@ export const uploadNewStudentsCSV = async (req: RequestWithFile, res: Response):
       errorLog: errors.length > 0 ? errorLogPath : null
     });
   } catch (error) {
-    console.error("Error uploading CSV:", error);
+    console.error("Error uploading file:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// Upload CSV file for updating existing students
+// Upload file for updating existing students
 export const uploadUpdateStudentsCSV = async (req: RequestWithFile, res: Response): Promise<void> => {
   try {
     if (!req.file) {
@@ -903,9 +944,9 @@ export const uploadUpdateStudentsCSV = async (req: RequestWithFile, res: Respons
       return;
     }
     
-    // Only ADMIN can upload CSV
+    // Only ADMIN can upload files
     if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ message: "Only administrators can upload CSV files" });
+      res.status(403).json({ message: "Only administrators can upload files" });
       return;
     }
     
@@ -922,21 +963,17 @@ export const uploadUpdateStudentsCSV = async (req: RequestWithFile, res: Respons
     const joinedStatusValues = ["ALLOTED", "DISCONTINUED", "JOINED", "NOT JOINING", "CENTRE CHANGE"];
     const syllabusValues = ["STATE", "CBSE", "ICSE", "OTHER"];
     
-    // Parse CSV file
-    const parser = fs
-      .createReadStream(filePath)
-      .pipe(parse({
-        columns: true,
-        skip_empty_lines: true,
-        trim: true
-      }));
+    // Parse file using our utility
+    const records = await parseFile(filePath);
     
     // Create an error log file
     const errorLogPath = `src/uploads/error_log_${Date.now()}.json`;
+    let lineNumber = 1;
     
-    for await (const record of parser) {
+    for (const record of records) {
+      lineNumber++;
       try {
-        // Map CSV columns to student model fields with proper type conversions
+        // Map columns to student model fields with proper type conversions
         const studentData = {
           slNo: safeToNumber(record['Sl No']),
           name: safeToString(record['NAME']),
@@ -973,29 +1010,27 @@ export const uploadUpdateStudentsCSV = async (req: RequestWithFile, res: Respons
           throw new Error("Name and Student ID are required fields");
         }
         
-        // Check if student exists - for updates, student must exist
+        // Check if student exists - for update mode, student must already exist
         const existingStudent = await Student.findOne({ studentId: studentData.studentId });
         
-        if (!existingStudent) {
-          throw new Error(`Student ID ${studentData.studentId} does not exist`);
-        } else {
-          // Track if class teacher is changing
-          const oldClassTeacher = existingStudent.classTeacher;
-          const newClassTeacher = studentData.classTeacher;
-          
-          // Create an update object with only the fields that are present in the CSV
+        if (existingStudent) {
+          // Create an update object with only the fields that are present in the file
           const updateData: Record<string, any> = {};
           
-          // Iterate through the record object to check which fields are present in the CSV
+          // Iterate through the record object to check which fields are present
           for (const key in record) {
             const mappedKey = mapCSVColumnToModelField(key);
             if (mappedKey && record[key] !== undefined && record[key] !== '') {
-              // Only include fields that have values in the CSV
+              // Only include fields that have values
               updateData[mappedKey] = studentData[mappedKey as keyof typeof studentData];
             }
           }
           
-          // Update existing student with only the fields from the CSV
+          // Track if class teacher is changing
+          const oldClassTeacher = existingStudent.classTeacher;
+          const newClassTeacher = studentData.classTeacher;
+          
+          // Update existing student with only the fields from the file
           await Student.findByIdAndUpdate(existingStudent._id, updateData);
           
           // If class teacher changed, update mentor assignments
@@ -1034,13 +1069,15 @@ export const uploadUpdateStudentsCSV = async (req: RequestWithFile, res: Respons
             name: studentData.name, 
             status: 'updated' 
           });
+        } else {
+          throw new Error(`Student ID ${studentData.studentId} does not exist`);
         }
       } catch (error) {
-        console.error("Error processing CSV record:", error);
+        console.error("Error processing record:", error);
         errors.push({ 
           record, 
           error: (error as Error).message,
-          line: parser.info.lines
+          line: lineNumber
         });
       }
     }
@@ -1053,7 +1090,7 @@ export const uploadUpdateStudentsCSV = async (req: RequestWithFile, res: Respons
     // Clean up the temporary file
     fs.unlinkSync(filePath);
     
-    // Log CSV upload
+    // Log file upload
     await Audit.create({
       user: req.user?.id,
       action: "UPLOAD_UPDATE",
@@ -1069,7 +1106,7 @@ export const uploadUpdateStudentsCSV = async (req: RequestWithFile, res: Respons
     });
     
     res.json({
-      message: "CSV processed successfully",
+      message: "File processed successfully",
       results: {
         total: results.length + errors.length,
         successful: results.length,
@@ -1081,7 +1118,7 @@ export const uploadUpdateStudentsCSV = async (req: RequestWithFile, res: Respons
       errorLog: errors.length > 0 ? errorLogPath : null
     });
   } catch (error) {
-    console.error("Error uploading CSV:", error);
+    console.error("Error uploading file:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

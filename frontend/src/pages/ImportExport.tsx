@@ -3,7 +3,7 @@ import { Upload, Download, FileSpreadsheet, AlertCircle, FileDown, UserPlus, Ref
 import Layout from '../components/layout/Layout';
 import Button from '../components/ui/Button';
 import { useStudentStore } from '../store/studentStore';
-import { studentsToExcel, downloadExcel } from '../utils/excelUtils';
+import { studentsToExcel, downloadExcel, studentsToCSV, studentsToPDF, downloadCSV, downloadPDF } from '../utils/excelUtils';
 import * as XLSX from 'xlsx';
 import FileNamePrompt from '../components/ui/FileNamePrompt';
 
@@ -18,7 +18,8 @@ const ImportExport: React.FC = () => {
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [importMode, setImportMode] = useState<'combined' | 'new' | 'update'>('combined');
   const [isFileNamePromptOpen, setIsFileNamePromptOpen] = useState(false);
-  const [exportData, setExportData] = useState<ArrayBuffer | null>(null);
+  const [exportData, setExportData] = useState<ArrayBuffer | string | null>(null);
+  const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | 'pdf'>('xlsx');
   
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, mode: 'combined' | 'new' | 'update') => {
     const file = e.target.files?.[0];
@@ -90,11 +91,22 @@ const ImportExport: React.FC = () => {
     }
     
     try {
-      const excelData = studentsToExcel(studentStore.getAllStudents);
-      setExportData(excelData);
-      setIsFileNamePromptOpen(true);
+      if (exportFormat === 'xlsx') {
+        const excelData = studentsToExcel(studentStore.getAllStudents);
+        setExportData(excelData);
+        setIsFileNamePromptOpen(true);
+      } else if (exportFormat === 'csv') {
+        const csvData = studentsToCSV(studentStore.getAllStudents);
+        setExportData(csvData);
+        setIsFileNamePromptOpen(true);
+      } else if (exportFormat === 'pdf') {
+        const pdfDoc = studentsToPDF(studentStore.getAllStudents);
+        // For PDF we'll just save directly as it handles its own prompts
+        downloadPDF(pdfDoc, `students-export-${new Date().toISOString().slice(0, 10)}.pdf`);
+        setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to PDF`);
+      }
     } catch (err) {
-      console.error('Error exporting to Excel:', err);
+      console.error('Error exporting data:', err);
       alert('Failed to export students data');
     }
   };
@@ -102,8 +114,13 @@ const ImportExport: React.FC = () => {
   const handleExportWithFilename = (filename: string) => {
     if (!exportData) return;
     
-    downloadExcel(exportData, `${filename}.xlsx`);
-    setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to ${filename}.xlsx`);
+    if (exportFormat === 'xlsx') {
+      downloadExcel(exportData as ArrayBuffer, `${filename}.xlsx`);
+      setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to ${filename}.xlsx`);
+    } else if (exportFormat === 'csv') {
+      downloadCSV(exportData as string, `${filename}.csv`);
+      setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to ${filename}.csv`);
+    }
   };
   
   const handleDownloadTemplate = () => {
@@ -403,6 +420,22 @@ const ImportExport: React.FC = () => {
             Export all student data to an Excel file. The file will include all student fields.
           </p>
           
+          <div className="mb-4">
+            <label htmlFor="export-format" className="text-gray-700 font-medium">
+              Export Format:
+            </label>
+            <select
+              id="export-format"
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value as 'xlsx' | 'csv' | 'pdf')}
+              className="mt-2 p-2 border rounded-md"
+            >
+              <option value="xlsx">Excel (.xlsx)</option>
+              <option value="csv">CSV</option>
+              <option value="pdf">PDF</option>
+            </select>
+          </div>
+          
           <div className="mt-4">
             <Button
               variant="success"
@@ -411,7 +444,7 @@ const ImportExport: React.FC = () => {
               disabled={studentStore.getAllStudents.length === 0}
             >
               <FileSpreadsheet size={16} className="mr-2" />
-              Export to Excel
+              Export to {exportFormat.toUpperCase()}
             </Button>
           </div>
           
@@ -433,7 +466,7 @@ const ImportExport: React.FC = () => {
         onConfirm={handleExportWithFilename}
         defaultFileName={`students-export-${new Date().toISOString().slice(0, 10)}`}
         title="Export Students"
-        fileType="Excel (.xlsx)"
+        fileType={exportFormat.toUpperCase()}
       />
     </Layout>
   );

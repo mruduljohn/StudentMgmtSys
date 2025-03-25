@@ -12,7 +12,8 @@ import {
   UserPlus,
   Menu,
   X,
-  Clock
+  Clock,
+  Database
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -77,6 +78,11 @@ const Sidebar: React.FC = () => {
                 <NavLink to="/import-export" className={linkClass}>
                   <FileSpreadsheet className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
                   {!isCollapsed && <span className="ml-3">Import/Export</span>}
+                </NavLink>
+                
+                <NavLink to="/database-backup" className={linkClass}>
+                  <Database className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
+                  {!isCollapsed && <span className="ml-3">Database Backup</span>}
                 </NavLink>
                 
                 <NavLink to="/audit-logs" className={linkClass}>
@@ -197,6 +203,15 @@ const Sidebar: React.FC = () => {
                 >
                   <FileSpreadsheet className="h-5 w-5 mr-3" />
                   <span>Import/Export</span>
+                </NavLink>
+                
+                <NavLink 
+                  to="/database-backup" 
+                  className="flex items-center px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-md"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Database className="h-5 w-5 mr-3" />
+                  <span>Database Backup</span>
                 </NavLink>
                 
                 <NavLink 

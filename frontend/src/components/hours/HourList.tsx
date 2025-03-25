@@ -85,6 +85,28 @@ const HourList: React.FC = observer(() => {
         return 'bg-gray-100 text-gray-800';
     }
   };
+  
+  // Function to highlight search matches in text
+  const highlightSearchMatch = (text: string) => {
+    const chapterFilter = hourStore.filters.get('chapter') as string;
+    
+    if (!chapterFilter || typeof chapterFilter !== 'string' || chapterFilter.trim() === '') {
+      return <span>{text}</span>;
+    }
+    
+    const regex = new RegExp(`(${chapterFilter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+    
+    return (
+      <>
+        {parts.map((part, i) => 
+          regex.test(part) ? 
+            <span key={i} className="bg-yellow-200 font-medium">{part}</span> : 
+            <span key={i}>{part}</span>
+        )}
+      </>
+    );
+  };
 
   if (hourStore.isLoading && !hourStore.getHours.length) {
     return (
@@ -213,7 +235,7 @@ const HourList: React.FC = observer(() => {
                     {hour.subject}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.chapter}
+                    {highlightSearchMatch(hour.chapter)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {hour.mode}

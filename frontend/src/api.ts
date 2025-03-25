@@ -410,3 +410,96 @@ export const findStudent = async (studentId: string) => {
     throw error;
   }
 };
+
+// Database Backup API Functions
+export const listBackups = async () => {
+  try {
+    const response = await api.get('/backup');
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const createBackup = async () => {
+  try {
+    const response = await api.post('/backup');
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const downloadBackup = async (filename: string) => {
+  try {
+    const response = await api.get(`/backup/download/${filename}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const validateBackupFile = async (file: File) => {
+  try {
+    const formData = new FormData();
+    formData.append('backup', file);
+    const response = await api.post('/backup/restore', formData);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const restoreBackup = async (file: File) => {
+  try {
+    const formData = new FormData();
+    formData.append('backup', file);
+    const response = await api.post('/backup/restore?confirm=true', formData);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getBackupSchedule = async () => {
+  try {
+    const response = await api.get('/backup/schedule');
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateBackupSchedule = async (schedule: { 
+  hour: number; 
+  minute: number; 
+  enabled: boolean;
+}) => {
+  try {
+    const response = await api.post('/backup/schedule', schedule);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Test backup (for debugging)
+export const testBackup = async () => {
+  try {
+    const response = await api.post('/backup/test');
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const deleteBackup = async (filename: string) => {
+  try {
+    const response = await api.delete(`/backup/delete/${filename}`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};

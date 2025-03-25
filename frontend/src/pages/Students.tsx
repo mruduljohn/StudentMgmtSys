@@ -14,7 +14,7 @@ import FilterPanel, { FilterOption, FilterValue } from '../components/ui/FilterP
 import { useStudentStore } from '../store/studentStore';
 import { useAuthStore } from '../store/authStore';
 import { Student } from '../types';
-import { studentsToExcel, downloadExcel } from '../utils/excelUtils';
+import { studentsToExcel, downloadExcel, studentsToCSV, studentsToPDF, downloadCSV, downloadPDF } from '../utils/excelUtils';
 import PasswordConfirmModal from '../components/ui/PasswordConfirmModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import FileNamePrompt from '../components/ui/FileNamePrompt';
@@ -103,9 +103,10 @@ const Students: React.FC = observer(() => {
   const [errorMessage, setErrorMessage] = useState<string>('');
   // Add states for file export
   const [isFileNamePromptOpen, setIsFileNamePromptOpen] = useState(false);
-  const [exportData, setExportData] = useState<ArrayBuffer | null>(null);
+  const [exportData, setExportData] = useState<ArrayBuffer | string | null>(null);
   const [exportType, setExportType] = useState<'all' | 'filtered' | 'selected'>('all');
   const [exportDefaultFilename, setExportDefaultFilename] = useState('students');
+  const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | 'pdf'>('xlsx');
   
   // Define the function to get a clickable name cell
   const getNameCell = (student: ExtendedStudent) => (
@@ -664,6 +665,18 @@ const Students: React.FC = observer(() => {
           Deselect All
         </Button>
 
+        {/* Export format selector */}
+        <select
+          className="p-1 border rounded text-sm"
+          value={exportFormat}
+          onChange={(e) => setExportFormat(e.target.value as 'xlsx' | 'csv' | 'pdf')}
+          title="Select export format"
+        >
+          <option value="xlsx">Excel (.xlsx)</option>
+          <option value="csv">CSV</option>
+          <option value="pdf">PDF</option>
+        </select>
+
         {/* Export actions */}
         <Button
           variant="primary"
@@ -781,18 +794,45 @@ const Students: React.FC = observer(() => {
       return;
     }
     
-    const excelData = studentsToExcel(students);
-    setExportData(excelData);
-    setExportDefaultFilename(defaultName);
-    setIsFileNamePromptOpen(true);
+    try {
+      if (exportFormat === 'xlsx') {
+        const excelData = studentsToExcel(students);
+        setExportData(excelData);
+        setExportDefaultFilename(defaultName);
+        setIsFileNamePromptOpen(true);
+      } else if (exportFormat === 'csv') {
+        const csvData = studentsToCSV(students);
+        setExportData(csvData);
+        setExportDefaultFilename(defaultName);
+        setIsFileNamePromptOpen(true);
+      } else if (exportFormat === 'pdf') {
+        const pdfDoc = studentsToPDF(students);
+        // For PDF we'll just save directly as it handles its own prompts
+        downloadPDF(pdfDoc, `${defaultName}.pdf`);
+        showSuccessMessage(`Successfully exported ${students.length} students to PDF`);
+      }
+    } catch (err) {
+      console.error('Error exporting data:', err);
+      showErrorMessage('Failed to export students data');
+    }
   };
   
   // Function to handle the export after filename is provided
   const handleExportWithFilename = (filename: string): void => {
     if (!exportData) return;
     
-    downloadExcel(exportData, `${filename}.xlsx`);
-    showSuccessMessage(`Exported ${exportType === 'all' ? 'all' : exportType === 'filtered' ? 'filtered' : 'selected'} students successfully`);
+    try {
+      if (exportFormat === 'xlsx') {
+        downloadExcel(exportData as ArrayBuffer, `${filename}.xlsx`);
+        showSuccessMessage(`Exported ${exportType === 'all' ? 'all' : exportType === 'filtered' ? 'filtered' : 'selected'} students to ${filename}.xlsx`);
+      } else if (exportFormat === 'csv') {
+        downloadCSV(exportData as string, `${filename}.csv`);
+        showSuccessMessage(`Exported ${exportType === 'all' ? 'all' : exportType === 'filtered' ? 'filtered' : 'selected'} students to ${filename}.csv`);
+      }
+    } catch (err) {
+      console.error('Error downloading file:', err);
+      showErrorMessage('Failed to download file');
+    }
   };
   
   return (

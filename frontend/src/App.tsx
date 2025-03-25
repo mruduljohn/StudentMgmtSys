@@ -11,6 +11,7 @@ import AuditLogs from './pages/AuditLogs';
 import Analytics from './pages/Analytics';
 import UserManagement from './pages/UserManagement';
 import HourDashboard from './pages/HourDashboard';
+import DatabaseBackup from './pages/DatabaseBackup';
 
 // Stores
 import { useAuthStore } from './store/authStore';
@@ -75,6 +76,7 @@ function App() {
         <Route path="/analytics" element={<ProtectedRoute element={<Analytics />} />} />
         <Route path="/users" element={<ProtectedRoute element={<UserManagement />} adminOnly />} />
         <Route path="/hours" element={<ProtectedRoute element={<HourDashboard />} />} />
+        <Route path="/database-backup" element={<ProtectedRoute element={<DatabaseBackup />} adminOnly />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

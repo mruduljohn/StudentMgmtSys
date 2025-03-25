@@ -12,8 +12,11 @@ import {
   CardHeader,
   LinearProgress,
   Chip,
-  Alert
+  Alert,
+  TextField,
+  InputAdornment
 } from '@mui/material';
+import { Search } from 'lucide-react';
 import { useHourStore } from '../../store/hourStore';
 import ChapterProgressBarGraph from './ChapterProgressBarGraph';
 
@@ -35,6 +38,7 @@ const ChapterStatus: React.FC<ChapterStatusProps> = observer(({ batch, subject }
   const [chapters, setChapters] = useState<ChapterData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
     const fetchChapterStatus = async () => {
@@ -78,6 +82,37 @@ const ChapterStatus: React.FC<ChapterStatusProps> = observer(({ batch, subject }
     if (progress < 30) return 'error';
     if (progress < 70) return 'warning';
     return 'success';
+  };
+  
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+  };
+  
+  // Filter chapters based on search query
+  const filteredChapters = searchQuery.trim() === '' 
+    ? chapters 
+    : chapters.filter(chapter => 
+        chapter.chapter.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+  
+  // Highlight search matches in text
+  const highlightSearchMatch = (text: string) => {
+    if (!searchQuery || searchQuery.trim() === '') {
+      return text;
+    }
+    
+    const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+    
+    return (
+      <>
+        {parts.map((part, i) => 
+          regex.test(part) ? 
+            <span key={i} style={{ backgroundColor: '#FFEB3B', fontWeight: 'bold' }}>{part}</span> : 
+            <span key={i}>{part}</span>
+        )}
+      </>
+    );
   };
 
   if (loading) {
@@ -146,54 +181,76 @@ const ChapterStatus: React.FC<ChapterStatusProps> = observer(({ batch, subject }
             </Card>
           </Box>
 
-          <Typography variant="h6" gutterBottom>
-            Chapter Details
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">
+              Chapter Details
+            </Typography>
+            <TextField
+              placeholder="Search chapters..."
+              size="small"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search size={20} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ width: '250px' }}
+            />
+          </Box>
           <Divider sx={{ mb: 2 }} />
-
-          <Grid container spacing={2}>
-            {chapters.map((chapter, index) => (
-              <Grid item xs={12} sm={6} md={4} key={index}>
-                <Paper sx={{ p: 2, height: '100%' }}>
-                  <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      {chapter.chapter}
-                    </Typography>
-                    <Chip 
-                      label={chapter.status} 
-                      size="small" 
-                      color={getStatusColor(chapter.status) as 'error' | 'warning' | 'success' | 'default'}
-                    />
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                    <Box sx={{ width: '100%', mr: 1 }}>
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={chapter.progress} 
-                        color={getProgressColor(chapter.progress)}
+          
+          {filteredChapters.length === 0 ? (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              No chapters found matching "{searchQuery}"
+            </Alert>
+          ) : (
+            <Grid container spacing={2}>
+              {filteredChapters.map((chapter, index) => (
+                <Grid item xs={12} sm={6} md={4} key={index}>
+                  <Paper sx={{ p: 2, height: '100%' }}>
+                    <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        {highlightSearchMatch(chapter.chapter)}
+                      </Typography>
+                      <Chip 
+                        label={chapter.status} 
+                        size="small" 
+                        color={getStatusColor(chapter.status) as 'error' | 'warning' | 'success' | 'default'}
                       />
                     </Box>
-                    <Box sx={{ minWidth: 35 }}>
-                      <Typography variant="body2" color="text.secondary">{`${chapter.progress}%`}</Typography>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <Box sx={{ width: '100%', mr: 1 }}>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={chapter.progress} 
+                          color={getProgressColor(chapter.progress)}
+                        />
+                      </Box>
+                      <Box sx={{ minWidth: 35 }}>
+                        <Typography variant="body2" color="text.secondary">{`${chapter.progress}%`}</Typography>
+                      </Box>
                     </Box>
-                  </Box>
-                  
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Subject: {subject}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Hours: {chapter.totalHours}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Last Updated: {new Date(chapter.lastUpdated).toLocaleDateString()}
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
+                    
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Subject: {subject}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Total Hours: {chapter.totalHours}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Last Updated: {new Date(chapter.lastUpdated).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          )}
         </>
       )}
     </Box>

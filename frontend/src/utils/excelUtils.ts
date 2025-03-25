@@ -1,6 +1,10 @@
 import * as XLSX from 'xlsx';
 import { Student } from '../types';
 
+// Add new imports for PDF export
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
 // Define a type for Excel row data
 interface ExcelRow {
   [key: string]: string | number | boolean | undefined;
@@ -170,6 +174,98 @@ export const studentsToExcel = (students: Student[]): ArrayBuffer => {
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
 };
 
+// Convert Student objects to CSV data
+export const studentsToCSV = (students: Student[]): string => {
+  const worksheet = XLSX.utils.json_to_sheet(students.map(student => ({
+    'Sl No': student.slNo,
+    'NAME': student.name,
+    'STUDENT ID': student.studentId,
+    'PHONE NUMBER': student.phoneNumber,
+    'GENDER': student.gender,
+    'BATCH': student.batch,
+    'CLASS TEACHER': student.classTeacher,
+    'Hostel': student.hostel,
+    'Stream': student.stream,
+    'PROGRAM': student.program,
+    'Study Material': student.studyMaterial,
+    'Uniform': student.uniform,
+    'ID Card': student.idCard,
+    'Tab': student.tab,
+    'JOINED': student.joined,
+    'Syllabus': student.syllabus,
+    'Percentage of +2 Marks': student.percentageOfPlus2Marks,
+    'NEET Score': student.neetScore,
+    'Remarks': student.remarks,
+    'Remarks 1': student.remarks1,
+    'Remarks 2': student.remarks2,
+    'Remarks 3': student.remarks3,
+    'Remarks 4': student.remarks4,
+    'Fee Due': student.feeDue,
+    'Flag1': student.flag1,
+    'Flag2': student.flag2,
+    'Flag3': student.flag3,
+    'Flag4': student.flag4,
+  })));
+  
+  return XLSX.utils.sheet_to_csv(worksheet);
+};
+
+// Convert Student objects to PDF data
+export const studentsToPDF = (students: Student[]): jsPDF => {
+  const doc = new jsPDF('landscape');
+  
+  // Define columns for PDF table
+  const columns = [
+    { header: 'Sl No', dataKey: 'slNo' },
+    { header: 'Name', dataKey: 'name' },
+    { header: 'Student ID', dataKey: 'studentId' },
+    { header: 'Phone', dataKey: 'phoneNumber' },
+    { header: 'Gender', dataKey: 'gender' },
+    { header: 'Batch', dataKey: 'batch' },
+    { header: 'Class Teacher', dataKey: 'classTeacher' },
+    { header: 'Hostel', dataKey: 'hostel' },
+    { header: 'Stream', dataKey: 'stream' },
+    { header: 'Program', dataKey: 'program' },
+    { header: 'Joined', dataKey: 'joined' },
+    { header: 'Fee Due', dataKey: 'feeDue' },
+  ];
+  
+  // Convert students to rows for PDF
+  const rows = students.map(student => ({
+    slNo: student.slNo,
+    name: student.name,
+    studentId: student.studentId,
+    phoneNumber: student.phoneNumber,
+    gender: student.gender,
+    batch: student.batch,
+    classTeacher: student.classTeacher,
+    hostel: student.hostel,
+    stream: student.stream,
+    program: student.program,
+    joined: student.joined,
+    feeDue: student.feeDue,
+  }));
+  
+  // Add title to PDF
+  doc.setFontSize(16);
+  doc.text('Student Records', 14, 15);
+  doc.setFontSize(10);
+  doc.text(`Generated on ${new Date().toLocaleString()}`, 14, 22);
+  
+  // Create table in PDF
+  (doc as any).autoTable({
+    startY: 30,
+    columns: columns,
+    body: rows,
+    styles: { overflow: 'linebreak' },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+    alternateRowStyles: { fillColor: [242, 242, 242] },
+    margin: { top: 30 },
+  });
+  
+  return doc;
+};
+
 // Download Excel file
 export const downloadExcel = (data: ArrayBuffer, filename: string): void => {
   const blob = new Blob([data], { type: 'application/octet-stream' });
@@ -181,4 +277,22 @@ export const downloadExcel = (data: ArrayBuffer, filename: string): void => {
   a.click();
   window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
+};
+
+// Download CSV file
+export const downloadCSV = (data: string, filename: string): void => {
+  const blob = new Blob([data], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+};
+
+// Download PDF file
+export const downloadPDF = (doc: jsPDF, filename: string): void => {
+  doc.save(filename);
 };

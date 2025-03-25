@@ -1,4 +1,5 @@
 import React from 'react';
+import { Search } from 'lucide-react';
 
 interface HourFiltersProps {
   batches: string[];
@@ -10,11 +11,13 @@ interface HourFiltersProps {
   selectedMode: string;
   selectedTeacher: string;
   selectedStatus: string;
+  chapterSearchQuery?: string;
   onBatchChange: (batch: string) => void;
   onSubjectChange: (subject: string) => void;
   onModeChange: (mode: string) => void;
   onTeacherChange: (teacher: string) => void;
   onStatusChange: (status: string) => void;
+  onChapterSearch?: (query: string) => void;
 }
 
 const HourFilters: React.FC<HourFiltersProps> = ({
@@ -27,11 +30,13 @@ const HourFilters: React.FC<HourFiltersProps> = ({
   selectedMode,
   selectedTeacher,
   selectedStatus,
+  chapterSearchQuery = '',
   onBatchChange,
   onSubjectChange,
   onModeChange,
   onTeacherChange,
-  onStatusChange
+  onStatusChange,
+  onChapterSearch = () => {}
 }) => {
   const handleBatchChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     onBatchChange(event.target.value);
@@ -52,10 +57,14 @@ const HourFilters: React.FC<HourFiltersProps> = ({
   const handleStatusChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     onStatusChange(event.target.value);
   };
+  
+  const handleChapterSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onChapterSearch(event.target.value);
+  };
 
   return (
     <div className="w-full">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <div>
           <label htmlFor="batch-select" className="block text-sm font-medium text-gray-700 mb-1">
             Batch
@@ -92,6 +101,25 @@ const HourFilters: React.FC<HourFiltersProps> = ({
               </option>
             ))}
           </select>
+        </div>
+        
+        <div>
+          <label htmlFor="chapter-search" className="block text-sm font-medium text-gray-700 mb-1">
+            Chapter Search
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
+            </div>
+            <input
+              id="chapter-search"
+              type="text"
+              placeholder="Search chapters..."
+              value={chapterSearchQuery}
+              onChange={handleChapterSearch}
+              className="pl-10 px-3 py-2 bg-white border shadow-sm border-gray-300 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-blue-500 block w-full rounded-md sm:text-sm focus:ring-1"
+            />
+          </div>
         </div>
         
         <div>

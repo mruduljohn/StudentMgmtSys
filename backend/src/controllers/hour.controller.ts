@@ -29,7 +29,7 @@ export const getAllHours = async (req: Request, res: Response): Promise<void> =>
     // Add specific filters
     if (req.query.batch) filter.batch = req.query.batch;
     if (req.query.subject) filter.subject = req.query.subject;
-    if (req.query.chapter) filter.chapter = req.query.chapter;
+    if (req.query.chapter) filter.chapter = new RegExp(req.query.chapter as string, 'i');
     if (req.query.mode) filter.mode = req.query.mode;
     if (req.query.classTeacher) filter.classTeacher = req.query.classTeacher;
     if (req.query.chapterStatus) filter.chapterStatus = req.query.chapterStatus;

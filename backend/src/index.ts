@@ -7,8 +7,10 @@ import studentRoutes from "./routes/student.routes";
 import configRoutes from "./routes/config.routes";
 import auditRoutes from "./routes/audit.routes";
 import hourRoutes from "./routes/hour.routes";
+import backupRoutes from "./routes/backup.routes";
 import { setupSwagger } from "./swagger";
 import { ensureUploadsDir } from "./utils/ensureUploadsDir";
+import { initBackupScheduler } from "./utils/backupScheduler";
 
 // Load environment variables
 dotenv.config();
@@ -42,6 +44,7 @@ app.use("/api", studentRoutes);
 app.use("/api", configRoutes);
 app.use("/api", auditRoutes);
 app.use("/api", hourRoutes);
+app.use("/api/backup", backupRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -55,6 +58,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Start Server
 app.listen(PORT, '0.0.0.0', async () => {
   await connectDB();
+  
+  // Initialize backup scheduler
+  await initBackupScheduler();
+  
   console.log(`🚀 Server is running on http://0.0.0.0:${PORT}`);
   console.log(`📚 API Documentation available at http://0.0.0.0:${PORT}/api-docs`);
 });

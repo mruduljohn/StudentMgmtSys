@@ -101,8 +101,8 @@ const Login: React.FC = () => {
           </form>
           
           <div className="mt-4 text-center text-sm text-gray-600">
-            <p>Default Admin Account:</p>
-            <p>Username: admin / Password: admin123</p>
+            {/* <p>Default Admin Account:</p>
+            <p>Username: admin / Password: admin123</p> */}
           </div>
         </div>
       </div>
