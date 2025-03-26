@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { observer } from 'mobx-react-lite';
-import { Edit, Trash2, Plus, ArrowUp, ArrowDown } from 'lucide-react';
+import { Edit, Trash2, Plus, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import { useHourStore } from '../../store/hourStore';
 import { Hour } from '../../types';
 import HourModal from './HourModal';
 import ConfirmDialog from '../common/ConfirmDialog';
 import { formatDate } from '../../utils/formatters';
 import Button from '../../components/ui/Button';
+import { hoursToExcel, downloadExcel, hoursToCSV, downloadCSV, hoursToPDF, downloadPDF } from '../../utils/excelUtils';
+import FileNamePrompt from '../ui/FileNamePrompt';
+import toast from 'react-hot-toast';
+import Menu from '../ui/Menu';
 
 const HourList: React.FC = observer(() => {
   const hourStore = useHourStore();
@@ -14,6 +18,9 @@ const HourList: React.FC = observer(() => {
   const [openEditModal, setOpenEditModal] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [selectedHour, setSelectedHour] = useState<Hour | null>(null);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isFileNamePromptOpen, setIsFileNamePromptOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | 'pdf'>('xlsx');
 
   const handleChangePage = (newPage: number) => {
     hourStore.setPage(newPage);
@@ -108,6 +115,42 @@ const HourList: React.FC = observer(() => {
     );
   };
 
+  const handleExportFormat = (format: 'xlsx' | 'csv' | 'pdf') => {
+    setExportFormat(format);
+    setIsExportMenuOpen(false);
+    setIsFileNamePromptOpen(true);
+  };
+  
+  const handleExport = (filename: string) => {
+    try {
+      const hours = hourStore.getHours;
+      if (hours.length === 0) {
+        toast.error('No hours data to export');
+        return;
+      }
+      
+      switch (exportFormat) {
+        case 'xlsx':
+          const excelData = hoursToExcel(hours);
+          downloadExcel(excelData, `${filename}.xlsx`);
+          break;
+        case 'csv':
+          const csvData = hoursToCSV(hours);
+          downloadCSV(csvData, `${filename}.csv`);
+          break;
+        case 'pdf':
+          const pdfDoc = hoursToPDF(hours);
+          downloadPDF(pdfDoc, `${filename}.pdf`);
+          break;
+      }
+      
+      toast.success(`Successfully exported ${hours.length} hour records`);
+    } catch (err) {
+      console.error('Error exporting data:', err);
+      toast.error('Failed to export data');
+    }
+  };
+
   if (hourStore.isLoading && !hourStore.getHours.length) {
     return (
       <div className="flex justify-center p-8">
@@ -120,13 +163,37 @@ const HourList: React.FC = observer(() => {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold">Hour Entries</h2>
-        <Button
-          variant="primary"
-          onClick={handleAddClick}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Hour
-        </Button>
+        <div className="flex space-x-2">
+          <div className="relative">
+            <Button
+              variant="secondary"
+              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            
+            {isExportMenuOpen && (
+              <Menu
+                items={[
+                  { label: 'Excel (.xlsx)', onClick: () => handleExportFormat('xlsx') },
+                  { label: 'CSV (.csv)', onClick: () => handleExportFormat('csv') },
+                  { label: 'PDF (.pdf)', onClick: () => handleExportFormat('pdf') }
+                ]}
+                onClose={() => setIsExportMenuOpen(false)}
+                className="right-0 mt-2"
+              />
+            )}
+          </div>
+          
+          <Button
+            variant="primary"
+            onClick={handleAddClick}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Hour
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-x-auto bg-white rounded-lg shadow">
@@ -153,7 +220,7 @@ const HourList: React.FC = observer(() => {
               </th>
               <th 
                 onClick={() => handleSort('chapter')}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                className="sticky left-0 z-10 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer bg-gray-50"
               >
                 Chapter {renderSortIcon('chapter')}
               </th>
@@ -234,7 +301,7 @@ const HourList: React.FC = observer(() => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {hour.subject}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="sticky left-0 z-10 px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-white">
                     {highlightSearchMatch(hour.chapter)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -420,6 +487,16 @@ const HourList: React.FC = observer(() => {
         content="Are you sure you want to delete this hour entry? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
+      />
+
+      {/* Add FileNamePrompt */}
+      <FileNamePrompt
+        isOpen={isFileNamePromptOpen}
+        onClose={() => setIsFileNamePromptOpen(false)}
+        onConfirm={handleExport}
+        defaultFileName={`hours-export-${new Date().toISOString().slice(0, 10)}`}
+        title="Export Hours"
+        fileType={exportFormat === 'xlsx' ? 'Excel (.xlsx)' : exportFormat === 'csv' ? 'CSV' : 'PDF'}
       />
     </div>
   );

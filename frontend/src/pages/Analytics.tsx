@@ -13,6 +13,7 @@ interface BatchSummary {
   idCardDue: number;
   tabDue: number;
   feeDue: number;
+  feeDueAmount: number;
 }
 
 interface HostelSummary {
@@ -81,6 +82,7 @@ const Analytics: React.FC = observer(() => {
               idCardDue: 0,
               tabDue: 0,
               feeDue: 0,
+              feeDueAmount: 0,
             });
           }
           
@@ -105,6 +107,7 @@ const Analytics: React.FC = observer(() => {
           
           if (student.feeDue > 0) {
             summary.feeDue++;
+            summary.feeDueAmount += student.feeDue;
           }
         });
         
@@ -366,7 +369,10 @@ const Analytics: React.FC = observer(() => {
                       Tab Due
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Fee Due
+                      Fee Due (Count)
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fee Due (Amount)
                     </th>
                   </tr>
                 </thead>
@@ -397,6 +403,9 @@ const Analytics: React.FC = observer(() => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {summary.feeDue}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ₹{summary.feeDueAmount.toLocaleString()}
+                      </td>
                     </tr>
                   ))}
                   {/* Total row */}
@@ -424,6 +433,9 @@ const Analytics: React.FC = observer(() => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                       {batchSummaries.reduce((sum, summary) => sum + summary.feeDue, 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      ₹{batchSummaries.reduce((sum, summary) => sum + summary.feeDueAmount, 0).toLocaleString()}
                     </td>
                   </tr>
                 </tbody>

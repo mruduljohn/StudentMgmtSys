@@ -296,3 +296,293 @@ export const downloadCSV = (data: string, filename: string): void => {
 export const downloadPDF = (doc: jsPDF, filename: string): void => {
   doc.save(filename);
 };
+
+// Convert Hour objects to Excel data
+export const hoursToExcel = (hours: any[]): ArrayBuffer => {
+  const worksheet = XLSX.utils.json_to_sheet(hours.map(hour => ({
+    'Batch': hour.batch,
+    'Subject': hour.subject,
+    'Chapter': hour.chapter,
+    'Mode': hour.mode,
+    'Class Teacher': hour.classTeacher,
+    'Status': hour.chapterStatus,
+    'Alloted Hours': hour.allotedHours,
+    'Completed Hours': hour.completedHours,
+    'Remaining Hours': hour.remainingHours,
+    'Average Marks': hour.averageMarksOfBatch,
+    'A+ Count': hour.numberOfAPlus,
+    'Remarks 1': hour.remarks1,
+    'Remarks 2': hour.remarks2,
+    'Flag 1': hour.flag1,
+    'Flag 2': hour.flag2,
+    'Created At': hour.createdAt,
+    'Updated At': hour.updatedAt
+  })));
+  
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Hours');
+  
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+};
+
+// Convert Hour objects to CSV data
+export const hoursToCSV = (hours: any[]): string => {
+  const worksheet = XLSX.utils.json_to_sheet(hours.map(hour => ({
+    'Batch': hour.batch,
+    'Subject': hour.subject,
+    'Chapter': hour.chapter,
+    'Mode': hour.mode,
+    'Class Teacher': hour.classTeacher,
+    'Status': hour.chapterStatus,
+    'Alloted Hours': hour.allotedHours,
+    'Completed Hours': hour.completedHours,
+    'Remaining Hours': hour.remainingHours,
+    'Average Marks': hour.averageMarksOfBatch,
+    'A+ Count': hour.numberOfAPlus,
+    'Remarks 1': hour.remarks1,
+    'Remarks 2': hour.remarks2,
+    'Flag 1': hour.flag1,
+    'Flag 2': hour.flag2,
+    'Created At': hour.createdAt,
+    'Updated At': hour.updatedAt
+  })));
+  
+  return XLSX.utils.sheet_to_csv(worksheet);
+};
+
+// Convert Hour objects to PDF data
+export const hoursToPDF = (hours: any[]): jsPDF => {
+  const doc = new jsPDF('landscape');
+  
+  // Define columns for PDF table
+  const columns = [
+    { header: 'Batch', dataKey: 'batch' },
+    { header: 'Subject', dataKey: 'subject' },
+    { header: 'Chapter', dataKey: 'chapter' },
+    { header: 'Mode', dataKey: 'mode' },
+    { header: 'Class Teacher', dataKey: 'classTeacher' },
+    { header: 'Status', dataKey: 'status' },
+    { header: 'Alloted Hrs', dataKey: 'allotedHours' },
+    { header: 'Completed Hrs', dataKey: 'completedHours' },
+    { header: 'Remaining Hrs', dataKey: 'remainingHours' }
+  ];
+  
+  // Convert hours to rows for PDF
+  const rows = hours.map(hour => ({
+    batch: hour.batch,
+    subject: hour.subject,
+    chapter: hour.chapter,
+    mode: hour.mode,
+    classTeacher: hour.classTeacher,
+    status: hour.chapterStatus,
+    allotedHours: hour.allotedHours,
+    completedHours: hour.completedHours,
+    remainingHours: hour.remainingHours || (hour.allotedHours - hour.completedHours)
+  }));
+  
+  // Add title to PDF
+  doc.setFontSize(16);
+  doc.text('Hour Records', 14, 15);
+  doc.setFontSize(10);
+  doc.text(`Generated on ${new Date().toLocaleString()}`, 14, 22);
+  
+  // Create table in PDF
+  (doc as any).autoTable({
+    startY: 30,
+    columns: columns,
+    body: rows,
+    styles: { overflow: 'linebreak' },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+    alternateRowStyles: { fillColor: [242, 242, 242] },
+    margin: { top: 30 },
+  });
+  
+  return doc;
+};
+
+// Convert HourStats to Excel data for export
+export const hourStatsToExcel = (stats: any): ArrayBuffer => {
+  const workbook = XLSX.utils.book_new();
+  
+  // Convert subject stats
+  if (stats.subjectStats && stats.subjectStats.length > 0) {
+    const subjectWorksheet = XLSX.utils.json_to_sheet(stats.subjectStats.map((stat: any) => ({
+      'Subject': stat.subject,
+      'Total Alloted Hours': stat.totalAllotedHours,
+      'Total Completed Hours': stat.totalCompletedHours,
+      'Total Remaining Hours': stat.totalRemainingHours,
+      'Completion Percentage': `${stat.completionPercentage.toFixed(2)}%`
+    })));
+    XLSX.utils.book_append_sheet(workbook, subjectWorksheet, 'Subject Stats');
+  }
+  
+  // Convert batch stats
+  if (stats.batchStats && stats.batchStats.length > 0) {
+    const batchWorksheet = XLSX.utils.json_to_sheet(stats.batchStats.map((stat: any) => ({
+      'Batch': stat.batch,
+      'Subject': stat.subject,
+      'Total Alloted Hours': stat.totalAllotedHours,
+      'Total Completed Hours': stat.totalCompletedHours,
+      'Total Remaining Hours': stat.totalRemainingHours,
+      'Completed Chapters': stat.completedChapters,
+      'Ongoing Chapters': stat.ongoingChapters,
+      'Not Started Chapters': stat.notStartedChapters,
+      'Total Chapters': stat.totalChapters,
+      'Completion Percentage': `${stat.completionPercentage.toFixed(2)}%`
+    })));
+    XLSX.utils.book_append_sheet(workbook, batchWorksheet, 'Batch Stats');
+  }
+  
+  // Convert chapter status stats
+  if (stats.chapterStatusStats && stats.chapterStatusStats.length > 0) {
+    const statusWorksheet = XLSX.utils.json_to_sheet(stats.chapterStatusStats.map((stat: any) => ({
+      'Status': stat.status,
+      'Count': stat.count
+    })));
+    XLSX.utils.book_append_sheet(workbook, statusWorksheet, 'Status Stats');
+  }
+  
+  // Convert overall stats
+  if (stats.overallStats) {
+    const overallWorksheet = XLSX.utils.json_to_sheet([{
+      'Total Alloted Hours': stats.overallStats.totalAllotedHours,
+      'Total Completed Hours': stats.overallStats.totalCompletedHours,
+      'Total Remaining Hours': stats.overallStats.totalRemainingHours,
+      'Total Entries': stats.overallStats.totalEntries,
+      'Average Marks': stats.overallStats.averageMarks,
+      'Total A+': stats.overallStats.totalAPlus,
+      'Completion Percentage': `${stats.overallStats.completionPercentage.toFixed(2)}%`
+    }]);
+    XLSX.utils.book_append_sheet(workbook, overallWorksheet, 'Overall Stats');
+  }
+  
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+};
+
+// Convert HourStats to CSV (will use the first sheet only - subject stats)
+export const hourStatsToCSV = (stats: any): string => {
+  // For CSV, we'll focus on the subject stats as the primary dataset
+  if (stats.subjectStats && stats.subjectStats.length > 0) {
+    const worksheet = XLSX.utils.json_to_sheet(stats.subjectStats.map((stat: any) => ({
+      'Subject': stat.subject,
+      'Total Alloted Hours': stat.totalAllotedHours,
+      'Total Completed Hours': stat.totalCompletedHours,
+      'Total Remaining Hours': stat.totalRemainingHours,
+      'Completion Percentage': `${stat.completionPercentage.toFixed(2)}%`
+    })));
+    return XLSX.utils.sheet_to_csv(worksheet);
+  }
+  return '';
+};
+
+// Convert HourStats to PDF
+export const hourStatsToPDF = (stats: any): jsPDF => {
+  const doc = new jsPDF('landscape');
+  
+  // Add title to PDF
+  doc.setFontSize(16);
+  doc.text('Hour Statistics Report', 14, 15);
+  doc.setFontSize(10);
+  doc.text(`Generated on ${new Date().toLocaleString()}`, 14, 22);
+  
+  let yPosition = 30;
+  
+  // Add overall stats
+  if (stats.overallStats) {
+    doc.setFontSize(14);
+    doc.text('Overall Statistics', 14, yPosition);
+    yPosition += 10;
+    
+    (doc as any).autoTable({
+      startY: yPosition,
+      head: [['Metric', 'Value']],
+      body: [
+        ['Total Alloted Hours', stats.overallStats.totalAllotedHours],
+        ['Total Completed Hours', stats.overallStats.totalCompletedHours],
+        ['Total Remaining Hours', stats.overallStats.totalRemainingHours],
+        ['Total Entries', stats.overallStats.totalEntries],
+        ['Average Marks', stats.overallStats.averageMarks.toFixed(2)],
+        ['Total A+', stats.overallStats.totalAPlus],
+        ['Completion Percentage', `${stats.overallStats.completionPercentage.toFixed(2)}%`]
+      ],
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      alternateRowStyles: { fillColor: [242, 242, 242] },
+    });
+    
+    yPosition = (doc as any).lastAutoTable.finalY + 15;
+  }
+  
+  // Add subject stats
+  if (stats.subjectStats && stats.subjectStats.length > 0) {
+    doc.setFontSize(14);
+    doc.text('Subject Statistics', 14, yPosition);
+    yPosition += 10;
+    
+    const columns = [
+      { header: 'Subject', dataKey: 'subject' },
+      { header: 'Alloted Hours', dataKey: 'allotedHours' },
+      { header: 'Completed Hours', dataKey: 'completedHours' },
+      { header: 'Remaining Hours', dataKey: 'remainingHours' },
+      { header: 'Completion %', dataKey: 'completionPercentage' }
+    ];
+    
+    const rows = stats.subjectStats.map((stat: any) => ({
+      subject: stat.subject,
+      allotedHours: stat.totalAllotedHours,
+      completedHours: stat.totalCompletedHours,
+      remainingHours: stat.totalRemainingHours,
+      completionPercentage: `${stat.completionPercentage.toFixed(2)}%`
+    }));
+    
+    (doc as any).autoTable({
+      startY: yPosition,
+      columns: columns,
+      body: rows,
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      alternateRowStyles: { fillColor: [242, 242, 242] },
+    });
+    
+    yPosition = (doc as any).lastAutoTable.finalY + 15;
+  }
+  
+  // Add a new page if needed
+  if (yPosition > 180) {
+    doc.addPage();
+    yPosition = 20;
+  }
+  
+  // Add batch stats (first few columns only to fit)
+  if (stats.batchStats && stats.batchStats.length > 0) {
+    doc.setFontSize(14);
+    doc.text('Batch Statistics', 14, yPosition);
+    yPosition += 10;
+    
+    const columns = [
+      { header: 'Batch', dataKey: 'batch' },
+      { header: 'Subject', dataKey: 'subject' },
+      { header: 'Alloted', dataKey: 'allotedHours' },
+      { header: 'Completed', dataKey: 'completedHours' },
+      { header: 'Remaining', dataKey: 'remainingHours' },
+      { header: 'Completion %', dataKey: 'completionPercentage' }
+    ];
+    
+    const rows = stats.batchStats.map((stat: any) => ({
+      batch: stat.batch,
+      subject: stat.subject,
+      allotedHours: stat.totalAllotedHours,
+      completedHours: stat.totalCompletedHours,
+      remainingHours: stat.totalRemainingHours,
+      completionPercentage: `${stat.completionPercentage.toFixed(2)}%`
+    }));
+    
+    (doc as any).autoTable({
+      startY: yPosition,
+      columns: columns,
+      body: rows,
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      alternateRowStyles: { fillColor: [242, 242, 242] },
+    });
+  }
+  
+  return doc;
+};

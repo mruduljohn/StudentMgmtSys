@@ -1,14 +1,16 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Download, FileSpreadsheet, AlertCircle, FileDown, UserPlus, RefreshCw } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, AlertCircle, FileDown, UserPlus, RefreshCw, Clock } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/ui/Button';
 import { useStudentStore } from '../store/studentStore';
-import { studentsToExcel, downloadExcel, studentsToCSV, studentsToPDF, downloadCSV, downloadPDF } from '../utils/excelUtils';
+import { useHourStore } from '../store/hourStore';
+import { studentsToExcel, downloadExcel, studentsToCSV, studentsToPDF, downloadCSV, downloadPDF, hoursToExcel, hoursToCSV, hoursToPDF, hourStatsToExcel, hourStatsToCSV, hourStatsToPDF } from '../utils/excelUtils';
 import * as XLSX from 'xlsx';
 import FileNamePrompt from '../components/ui/FileNamePrompt';
 
 const ImportExport: React.FC = () => {
   const studentStore = useStudentStore();
+  const hourStore = useHourStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newStudentsFileInputRef = useRef<HTMLInputElement>(null);
   const updateStudentsFileInputRef = useRef<HTMLInputElement>(null);
@@ -20,6 +22,9 @@ const ImportExport: React.FC = () => {
   const [isFileNamePromptOpen, setIsFileNamePromptOpen] = useState(false);
   const [exportData, setExportData] = useState<ArrayBuffer | string | null>(null);
   const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | 'pdf'>('xlsx');
+  const [exportType, setExportType] = useState<'students' | 'hours' | 'hourStats'>('students');
+  const [isHourStatsPromptOpen, setIsHourStatsPromptOpen] = useState(false);
+  const [hourStatsData, setHourStatsData] = useState<ArrayBuffer | string | null>(null);
   
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, mode: 'combined' | 'new' | 'update') => {
     const file = e.target.files?.[0];
@@ -85,42 +90,140 @@ const ImportExport: React.FC = () => {
   };
   
   const handleExport = () => {
-    if (studentStore.getAllStudents.length === 0) {
-      alert('No students to export');
-      return;
-    }
-    
-    try {
-      if (exportFormat === 'xlsx') {
-        const excelData = studentsToExcel(studentStore.getAllStudents);
-        setExportData(excelData);
-        setIsFileNamePromptOpen(true);
-      } else if (exportFormat === 'csv') {
-        const csvData = studentsToCSV(studentStore.getAllStudents);
-        setExportData(csvData);
-        setIsFileNamePromptOpen(true);
-      } else if (exportFormat === 'pdf') {
-        const pdfDoc = studentsToPDF(studentStore.getAllStudents);
-        // For PDF we'll just save directly as it handles its own prompts
-        downloadPDF(pdfDoc, `students-export-${new Date().toISOString().slice(0, 10)}.pdf`);
-        setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to PDF`);
+    if (exportType === 'students') {
+      if (studentStore.getAllStudents.length === 0) {
+        alert('No students to export');
+        return;
       }
-    } catch (err) {
-      console.error('Error exporting data:', err);
-      alert('Failed to export students data');
+      
+      try {
+        if (exportFormat === 'xlsx') {
+          const excelData = studentsToExcel(studentStore.getAllStudents);
+          setExportData(excelData);
+          setIsFileNamePromptOpen(true);
+        } else if (exportFormat === 'csv') {
+          const csvData = studentsToCSV(studentStore.getAllStudents);
+          setExportData(csvData);
+          setIsFileNamePromptOpen(true);
+        } else if (exportFormat === 'pdf') {
+          const pdfDoc = studentsToPDF(studentStore.getAllStudents);
+          // For PDF we'll just save directly as it handles its own prompts
+          downloadPDF(pdfDoc, `students-export-${new Date().toISOString().slice(0, 10)}.pdf`);
+          setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to PDF`);
+        }
+      } catch (err) {
+        console.error('Error exporting student data:', err);
+        alert('Failed to export students data');
+      }
+    } else if (exportType === 'hours') {
+      // Check if hourStore has been initialized
+      if (!hourStore.isDataLoaded) {
+        hourStore.init();
+      }
+      
+      // Fetch all hours (not just current page) for export
+      hourStore.fetchHours();
+      
+      const hours = hourStore.getHours;
+      if (hours.length === 0) {
+        alert('No hours data to export');
+        return;
+      }
+      
+      try {
+        if (exportFormat === 'xlsx') {
+          const excelData = hoursToExcel(hours);
+          setExportData(excelData);
+          setIsFileNamePromptOpen(true);
+        } else if (exportFormat === 'csv') {
+          const csvData = hoursToCSV(hours);
+          setExportData(csvData);
+          setIsFileNamePromptOpen(true);
+        } else if (exportFormat === 'pdf') {
+          const pdfDoc = hoursToPDF(hours);
+          downloadPDF(pdfDoc, `hours-export-${new Date().toISOString().slice(0, 10)}.pdf`);
+          setUploadSuccess(`Successfully exported ${hours.length} hour records to PDF`);
+        }
+      } catch (err) {
+        console.error('Error exporting hours data:', err);
+        alert('Failed to export hours data');
+      }
+    } else if (exportType === 'hourStats') {
+      // Check if hourStore has been initialized
+      if (!hourStore.isDataLoaded) {
+        hourStore.init();
+      }
+      
+      // Fetch stats if not already available
+      if (!hourStore.getStats) {
+        hourStore.fetchStats();
+      }
+      
+      const stats = hourStore.getStats;
+      if (!stats) {
+        alert('No hour statistics available');
+        return;
+      }
+      
+      try {
+        if (exportFormat === 'xlsx') {
+          const excelData = hourStatsToExcel(stats);
+          setHourStatsData(excelData);
+          setIsHourStatsPromptOpen(true);
+        } else if (exportFormat === 'csv') {
+          const csvData = hourStatsToCSV(stats);
+          setHourStatsData(csvData);
+          setIsHourStatsPromptOpen(true);
+        } else if (exportFormat === 'pdf') {
+          const pdfDoc = hourStatsToPDF(stats);
+          downloadPDF(pdfDoc, `hour-stats-export-${new Date().toISOString().slice(0, 10)}.pdf`);
+          setUploadSuccess('Successfully exported hour statistics to PDF');
+        }
+      } catch (err) {
+        console.error('Error exporting hour stats:', err);
+        alert('Failed to export hour statistics');
+      }
     }
   };
   
   const handleExportWithFilename = (filename: string) => {
     if (!exportData) return;
     
-    if (exportFormat === 'xlsx') {
-      downloadExcel(exportData as ArrayBuffer, `${filename}.xlsx`);
-      setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to ${filename}.xlsx`);
-    } else if (exportFormat === 'csv') {
-      downloadCSV(exportData as string, `${filename}.csv`);
-      setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to ${filename}.csv`);
+    if (exportType === 'students') {
+      if (exportFormat === 'xlsx') {
+        downloadExcel(exportData as ArrayBuffer, `${filename}.xlsx`);
+        setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to ${filename}.xlsx`);
+      } else if (exportFormat === 'csv') {
+        downloadCSV(exportData as string, `${filename}.csv`);
+        setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to ${filename}.csv`);
+      }
+    } else if (exportType === 'hours') {
+      if (exportFormat === 'xlsx') {
+        downloadExcel(exportData as ArrayBuffer, `${filename}.xlsx`);
+        setUploadSuccess(`Successfully exported ${hourStore.getHours.length} hour records to ${filename}.xlsx`);
+      } else if (exportFormat === 'csv') {
+        downloadCSV(exportData as string, `${filename}.csv`);
+        setUploadSuccess(`Successfully exported ${hourStore.getHours.length} hour records to ${filename}.csv`);
+      }
     }
+    
+    // Clear export data
+    setExportData(null);
+  };
+  
+  const handleHourStatsExportWithFilename = (filename: string) => {
+    if (!hourStatsData) return;
+    
+    if (exportFormat === 'xlsx') {
+      downloadExcel(hourStatsData as ArrayBuffer, `${filename}.xlsx`);
+      setUploadSuccess(`Successfully exported hour statistics to ${filename}.xlsx`);
+    } else if (exportFormat === 'csv') {
+      downloadCSV(hourStatsData as string, `${filename}.csv`);
+      setUploadSuccess(`Successfully exported hour statistics to ${filename}.csv`);
+    }
+    
+    // Clear export data
+    setHourStatsData(null);
   };
   
   const handleDownloadTemplate = () => {
@@ -213,7 +316,7 @@ const ImportExport: React.FC = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Import/Export</h1>
         <p className="text-gray-600">
-          Import students from Excel or export current students to Excel
+          Import or export data from the system
         </p>
       </div>
       
@@ -413,22 +516,36 @@ const ImportExport: React.FC = () => {
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center mb-4">
             <Download className="h-6 w-6 text-green-500 mr-2" />
-            <h2 className="text-lg font-semibold">Export Students</h2>
+            <h2 className="text-lg font-semibold">Export Data</h2>
           </div>
           
           <p className="text-gray-600 mb-4">
-            Export all student data to an Excel file. The file will include all student fields.
+            Export data from the system in various formats. Choose the type of data and format below.
           </p>
           
           <div className="mb-4">
-            <label htmlFor="export-format" className="text-gray-700 font-medium">
+            <label htmlFor="export-type" className="text-gray-700 font-medium block mb-2">
+              Export Data Type:
+            </label>
+            <select
+              id="export-type"
+              value={exportType}
+              onChange={(e) => setExportType(e.target.value as 'students' | 'hours' | 'hourStats')}
+              className="p-2 border rounded-md w-full mb-4"
+            >
+              <option value="students">Students Data</option>
+              <option value="hours">Hours Data</option>
+              <option value="hourStats">Hour Statistics</option>
+            </select>
+            
+            <label htmlFor="export-format" className="text-gray-700 font-medium block mb-2">
               Export Format:
             </label>
             <select
               id="export-format"
               value={exportFormat}
               onChange={(e) => setExportFormat(e.target.value as 'xlsx' | 'csv' | 'pdf')}
-              className="mt-2 p-2 border rounded-md"
+              className="p-2 border rounded-md w-full"
             >
               <option value="xlsx">Excel (.xlsx)</option>
               <option value="csv">CSV</option>
@@ -441,31 +558,65 @@ const ImportExport: React.FC = () => {
               variant="success"
               className="flex items-center"
               onClick={handleExport}
-              disabled={studentStore.getAllStudents.length === 0}
             >
-              <FileSpreadsheet size={16} className="mr-2" />
-              Export to {exportFormat.toUpperCase()}
+              {exportType === 'students' ? (
+                <FileSpreadsheet size={16} className="mr-2" />
+              ) : (
+                <Clock size={16} className="mr-2" />
+              )}
+              Export {exportType === 'students' ? 'Students' : exportType === 'hours' ? 'Hours' : 'Hour Statistics'} to {exportFormat.toUpperCase()}
             </Button>
           </div>
           
           <div className="mt-4 text-sm text-gray-500">
-            <p>Total students: {studentStore.getAllStudents.length}</p>
-            {studentStore.getAllStudents.length === 0 && (
-              <p className="text-yellow-600 mt-2">
-                No students to export. Import students first.
-              </p>
+            {exportType === 'students' && (
+              <>
+                <p>Total students: {studentStore.getAllStudents.length}</p>
+                {studentStore.getAllStudents.length === 0 && (
+                  <p className="text-yellow-600 mt-2">
+                    No students to export. Import students first.
+                  </p>
+                )}
+              </>
+            )}
+            {exportType === 'hours' && (
+              <>
+                <p>Total hour records: {hourStore.getTotalHours}</p>
+                {hourStore.getTotalHours === 0 && (
+                  <p className="text-yellow-600 mt-2">
+                    No hour records to export.
+                  </p>
+                )}
+              </>
+            )}
+            {exportType === 'hourStats' && (
+              <p>Export detailed statistics about hours and chapters across batches and subjects.</p>
             )}
           </div>
         </div>
       </div>
       
-      {/* Add the FileNamePrompt component */}
+      {/* FileNamePrompt for Students and Hours */}
       <FileNamePrompt
         isOpen={isFileNamePromptOpen}
         onClose={() => setIsFileNamePromptOpen(false)}
         onConfirm={handleExportWithFilename}
-        defaultFileName={`students-export-${new Date().toISOString().slice(0, 10)}`}
-        title="Export Students"
+        defaultFileName={
+          exportType === 'students' 
+            ? `students-export-${new Date().toISOString().slice(0, 10)}`
+            : `hours-export-${new Date().toISOString().slice(0, 10)}`
+        }
+        title={`Export ${exportType === 'students' ? 'Students' : 'Hours'}`}
+        fileType={exportFormat.toUpperCase()}
+      />
+      
+      {/* FileNamePrompt for Hour Stats */}
+      <FileNamePrompt
+        isOpen={isHourStatsPromptOpen}
+        onClose={() => setIsHourStatsPromptOpen(false)}
+        onConfirm={handleHourStatsExportWithFilename}
+        defaultFileName={`hour-stats-export-${new Date().toISOString().slice(0, 10)}`}
+        title="Export Hour Statistics"
         fileType={exportFormat.toUpperCase()}
       />
     </Layout>

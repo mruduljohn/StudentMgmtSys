@@ -46,6 +46,9 @@ const UserManagement: React.FC = () => {
     class: ''
   });
 
+  const [adminDeleteConfirmation, setAdminDeleteConfirmation] = useState('');
+  const [adminDeleteConfirmText, setAdminDeleteConfirmText] = useState('');
+
   // Fetch all users on component mount
   useEffect(() => {
     fetchUsers();
@@ -120,11 +123,20 @@ const UserManagement: React.FC = () => {
       return;
     }
 
+    // Extra validation for admin user deletion
+    if (selectedUser.role === 'ADMIN') {
+      if (adminDeleteConfirmation !== adminDeleteConfirmText) {
+        setError('Please type the confirmation text exactly to delete an admin user.');
+        return;
+      }
+    }
+
     try {
       console.log('Deleting user with ID:', selectedUser.id);
       await deleteUser(selectedUser.id);
       setSuccess('User deleted successfully');
       setIsDeleteModalOpen(false);
+      setAdminDeleteConfirmation('');
       fetchUsers(); // Refresh the user list
     } catch (error) {
       const apiError = error as ApiError;
@@ -486,21 +498,48 @@ const UserManagement: React.FC = () => {
         title="Delete User"
       >
         <div className="p-4">
-          <p className="mb-4">
+          <p className="text-center text-red-600 my-2">
             Are you sure you want to delete the user <strong>{selectedUser?.name}</strong>?
             This action cannot be undone.
           </p>
           
+          {selectedUser?.role === 'ADMIN' && (
+            <>
+              <div className="bg-yellow-100 text-yellow-800 p-3 rounded-md mb-4">
+                <p className="font-medium">Warning: You are about to delete an ADMIN account!</p>
+                <p className="text-sm">Deleting an admin account can have serious consequences for system access and management.</p>
+              </div>
+              
+              <div className="my-4">
+                <p className="text-sm text-gray-700 mb-2">
+                  To confirm deletion of this admin account, please type: 
+                  <span className="font-bold text-red-600"> {selectedUser?.role === 'ADMIN' ? (adminDeleteConfirmText = `DELETE-${selectedUser.username}`) : ''}</span>
+                </p>
+                <input
+                  type="text"
+                  value={adminDeleteConfirmation}
+                  onChange={(e) => setAdminDeleteConfirmation(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Type the confirmation text"
+                />
+              </div>
+            </>
+          )}
+          
           <div className="flex justify-end space-x-3">
             <Button
               variant="secondary"
-              onClick={() => setIsDeleteModalOpen(false)}
+              onClick={() => {
+                setIsDeleteModalOpen(false);
+                setAdminDeleteConfirmation('');
+              }}
             >
               Cancel
             </Button>
             <Button
               variant="danger"
               onClick={handleDeleteUser}
+              disabled={selectedUser?.role === 'ADMIN' && adminDeleteConfirmation !== adminDeleteConfirmText}
             >
               Delete User
             </Button>
@@ -519,6 +558,7 @@ const UserManagement: React.FC = () => {
             user={selectedUser}
             onClose={() => setIsResetPasswordModalOpen(false)}
             isSelf={selectedUser.id === currentUser?.id}
+            currentUserRole={currentUser?.role}
           />
         )}
       </Modal>

@@ -8,12 +8,14 @@ interface PasswordResetFormProps {
   user: User;
   onClose: () => void;
   isSelf?: boolean; // Whether the user is resetting their own password
+  currentUserRole?: string; // Role of the current user performing the action
 }
 
 const PasswordResetForm: React.FC<PasswordResetFormProps> = ({ 
   user, 
   onClose,
-  isSelf = false
+  isSelf = false,
+  currentUserRole = 'ADMIN'
 }) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -21,6 +23,10 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Determine if current password is required
+  // It's required for self changes or when an admin's password is being changed
+  const isCurrentPasswordRequired = isSelf || user.role === 'ADMIN';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,11 +44,17 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
       return;
     }
     
+    // Validate current password is provided when required
+    if (isCurrentPasswordRequired && !currentPassword) {
+      setError('Current password is required to change admin passwords');
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
       await resetPassword(user.id, {
-        currentPassword: isSelf ? currentPassword : undefined,
+        currentPassword: isCurrentPasswordRequired ? currentPassword : undefined,
         newPassword
       });
       
@@ -69,10 +81,17 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
         {isSelf ? 'Change Your Password' : `Reset Password for ${user.name}`}
       </h2>
       
-      {isSelf && (
+      {user.role === 'ADMIN' && !isSelf && (
+        <div className="p-3 bg-yellow-100 text-yellow-800 rounded-md mb-4">
+          <p className="font-medium">Warning: You are changing an admin account password</p>
+          <p className="text-sm">For security, your current password is required to confirm this action.</p>
+        </div>
+      )}
+      
+      {isCurrentPasswordRequired && (
         <Input
           type="password"
-          label="Current Password"
+          label={isSelf ? "Your Current Password" : "Your Admin Password"}
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           required

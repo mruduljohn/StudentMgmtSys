@@ -57,33 +57,11 @@ const HourDashboard: React.FC = observer(() => {
   const [isFileNamePromptOpen, setIsFileNamePromptOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | 'pdf'>('xlsx');
   const [exportData, setExportData] = useState<ArrayBuffer | string | jsPDF | null>(null);
-  
-  // Live clock state
-  const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date());
 
   useEffect(() => {
     // Initialize the store when component mounts
     hourStore.init();
-    
-    // Set up interval for updating the current time
-    const timeInterval = setInterval(() => {
-      setCurrentDateTime(new Date());
-    }, 1000);
-    
-    // Clean up interval on unmount
-    return () => {
-      clearInterval(timeInterval);
-    };
   }, [hourStore]);
-  
-  // Format the date and time
-  const formattedTime = currentDateTime.toLocaleTimeString();
-  const formattedDate = currentDateTime.toLocaleDateString(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
 
   const handleTabChange = (index: number) => {
     setTabValue(index);
@@ -318,18 +296,6 @@ const HourDashboard: React.FC = observer(() => {
 
   return (
     <Layout>
-      {/* Live clock display */}
-      <div className="mb-4 bg-gray-100 p-3 rounded-lg shadow-sm">
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="font-bold">Current Date:</span> {formattedDate}
-          </div>
-          <div>
-            <span className="font-bold">Current Time:</span> {formattedTime}
-          </div>
-        </div>
-      </div>
-      
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Hour Dashboard</h1>
         <p className="text-gray-600">
