@@ -510,10 +510,17 @@ const UserManagement: React.FC = () => {
                 <p className="text-sm">Deleting an admin account can have serious consequences for system access and management.</p>
               </div>
               
+              {/* Set the confirmation text when the component renders */}
+              {React.useEffect(() => {
+                if (selectedUser?.role === 'ADMIN') {
+                  setAdminDeleteConfirmText(`DELETE-${selectedUser.username}`);
+                }
+              }, [selectedUser])}
+              
               <div className="my-4">
                 <p className="text-sm text-gray-700 mb-2">
                   To confirm deletion of this admin account, please type: 
-                  <span className="font-bold text-red-600"> {selectedUser?.role === 'ADMIN' ? (adminDeleteConfirmText = `DELETE-${selectedUser.username}`) : ''}</span>
+                  <span className="font-bold text-red-600"> {adminDeleteConfirmText}</span>
                 </p>
                 <input
                   type="text"

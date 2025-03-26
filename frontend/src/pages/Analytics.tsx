@@ -66,10 +66,13 @@ const Analytics: React.FC = observer(() => {
         
         const allStudents = studentStore.getAllStudents;
         
+        // Filter to only include students who are JOINED
+        const joinedStudents = allStudents.filter(student => student.joined === 'JOINED');
+        
         // Process batch summaries
         const batchMap = new Map<string, BatchSummary>();
         
-        allStudents.forEach(student => {
+        joinedStudents.forEach(student => {
           if (!student.batch) return;
           
           if (!batchMap.has(student.batch)) {
@@ -120,7 +123,7 @@ const Analytics: React.FC = observer(() => {
         
         // Process hostel summaries
         const hostelMap = new Map<string, HostelSummary>();
-        const batchesSet = new Set<string>(allStudents.map(s => s.batch).filter(Boolean));
+        const batchesSet = new Set<string>(joinedStudents.map(s => s.batch).filter(Boolean));
         
         // Initialize hostel summaries
         Object.keys(hostelCapacities).forEach(hostel => {
@@ -153,7 +156,7 @@ const Analytics: React.FC = observer(() => {
         });
         
         // Count students by hostel and batch
-        allStudents.forEach(student => {
+        joinedStudents.forEach(student => {
           if (!student.hostel || !student.batch) return;
           
           const hostelName = student.hostel === 'DS' ? 'DAY SCHOLAR' : student.hostel;
@@ -200,7 +203,7 @@ const Analytics: React.FC = observer(() => {
           dayScholars: { boys: 0, girls: 0 },
         };
         
-        allStudents.forEach(student => {
+        joinedStudents.forEach(student => {
           if (!student.hostel || !student.gender) return;
           
           const isDayScholar = student.hostel === 'DS' || student.hostel === 'DAY SCHOLAR';
