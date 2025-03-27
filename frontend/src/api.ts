@@ -456,9 +456,39 @@ export const restoreBackup = async (file: File) => {
   try {
     const formData = new FormData();
     formData.append('backup', file);
-    const response = await api.post('/backup/restore?confirm=true', formData);
-    return response.data;
-  } catch (error) {
+    
+    // Configure axios with larger timeout and proper headers
+    const config = {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 120000, // 2 minutes timeout for large files
+    };
+
+    // First validate without confirming
+    console.log('Validating backup file...');
+    const validationResponse = await api.post('/backup/restore', formData, config);
+    console.log('Validation response:', validationResponse.data);
+    
+    // If validation is successful, confirm the restore
+    console.log('Starting restore with confirmation...');
+    const confirmResponse = await api.post('/backup/restore?confirm=true', formData, config);
+    console.log('Restore completed successfully:', confirmResponse.data);
+    
+    return confirmResponse.data;
+  } catch (error: any) {
+    console.error('Restore backup error:', error);
+    
+    // Enhance error information for debugging
+    if (error.response) {
+      console.error('Error response data:', error.response.data);
+      console.error('Error response status:', error.response.status);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    } else {
+      console.error('Error message:', error.message);
+    }
+    
     throw error;
   }
 };

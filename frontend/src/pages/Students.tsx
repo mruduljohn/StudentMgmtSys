@@ -807,12 +807,12 @@ const Students: React.FC = observer(() => {
         setIsFileNamePromptOpen(true);
       } else if (exportFormat === 'pdf') {
         const pdfDoc = studentsToPDF(students);
-        // For PDF we'll just save directly as it handles its own prompts
-        downloadPDF(pdfDoc, `${defaultName}.pdf`);
-        showSuccessMessage(`Successfully exported ${students.length} students to PDF`);
+        setExportData(pdfDoc);
+        setExportDefaultFilename(defaultName);
+        setIsFileNamePromptOpen(true);
       }
     } catch (err) {
-      console.error('Error exporting data:', err);
+      console.error('Error exporting student data:', err);
       showErrorMessage('Failed to export students data');
     }
   };
@@ -828,6 +828,9 @@ const Students: React.FC = observer(() => {
       } else if (exportFormat === 'csv') {
         downloadCSV(exportData as string, `${filename}.csv`);
         showSuccessMessage(`Exported ${exportType === 'all' ? 'all' : exportType === 'filtered' ? 'filtered' : 'selected'} students to ${filename}.csv`);
+      } else if (exportFormat === 'pdf') {
+        downloadPDF(exportData as any, `${filename}.pdf`);
+        showSuccessMessage(`Exported ${exportType === 'all' ? 'all' : exportType === 'filtered' ? 'filtered' : 'selected'} students to ${filename}.pdf`);
       }
     } catch (err) {
       console.error('Error downloading file:', err);

@@ -2,8 +2,8 @@ import * as XLSX from 'xlsx';
 import { Student } from '../types';
 
 // Add new imports for PDF export
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Define a type for Excel row data
 interface ExcelRow {
@@ -212,39 +212,72 @@ export const studentsToCSV = (students: Student[]): string => {
 
 // Convert Student objects to PDF data
 export const studentsToPDF = (students: Student[]): jsPDF => {
+  // Use landscape orientation with larger page size to fit all columns
   const doc = new jsPDF('landscape');
   
-  // Define columns for PDF table
-  const columns = [
-    { header: 'Sl No', dataKey: 'slNo' },
-    { header: 'Name', dataKey: 'name' },
-    { header: 'Student ID', dataKey: 'studentId' },
-    { header: 'Phone', dataKey: 'phoneNumber' },
-    { header: 'Gender', dataKey: 'gender' },
-    { header: 'Batch', dataKey: 'batch' },
-    { header: 'Class Teacher', dataKey: 'classTeacher' },
-    { header: 'Hostel', dataKey: 'hostel' },
-    { header: 'Stream', dataKey: 'stream' },
-    { header: 'Program', dataKey: 'program' },
-    { header: 'Joined', dataKey: 'joined' },
-    { header: 'Fee Due', dataKey: 'feeDue' },
+  // Define columns for PDF table - include all student fields
+  const tableColumn = [
+    'Sl No', 
+    'Name', 
+    'Student ID', 
+    'Phone', 
+    'Gender', 
+    'Batch', 
+    'Class Teacher', 
+    'Hostel', 
+    'Stream', 
+    'Program',
+    'Study Material',
+    'Uniform',
+    'ID Card',
+    'Tab',
+    'Joined', 
+    'Syllabus',
+    '+2 Marks %',
+    'NEET Score',
+    'Fee Due',
+    'Remarks',
+    'Remarks 1',
+    'Remarks 2',
+    'Remarks 3',
+    'Remarks 4',
+    'Flag 1',
+    'Flag 2',
+    'Flag 3',
+    'Flag 4'
   ];
   
-  // Convert students to rows for PDF
-  const rows = students.map(student => ({
-    slNo: student.slNo,
-    name: student.name,
-    studentId: student.studentId,
-    phoneNumber: student.phoneNumber,
-    gender: student.gender,
-    batch: student.batch,
-    classTeacher: student.classTeacher,
-    hostel: student.hostel,
-    stream: student.stream,
-    program: student.program,
-    joined: student.joined,
-    feeDue: student.feeDue,
-  }));
+  // Convert students to rows for PDF - include all fields
+  const tableRows = students.map(student => [
+    student.slNo,
+    student.name,
+    student.studentId,
+    student.phoneNumber,
+    student.gender,
+    student.batch,
+    student.classTeacher,
+    student.hostel,
+    student.stream,
+    student.program,
+    student.studyMaterial,
+    student.uniform,
+    student.idCard,
+    student.tab,
+    student.joined,
+    student.syllabus,
+    student.percentageOfPlus2Marks,
+    student.neetScore,
+    student.feeDue,
+    student.remarks,
+    student.remarks1,
+    student.remarks2,
+    student.remarks3,
+    student.remarks4,
+    student.flag1,
+    student.flag2,
+    student.flag3,
+    student.flag4
+  ]);
   
   // Add title to PDF
   doc.setFontSize(16);
@@ -252,15 +285,45 @@ export const studentsToPDF = (students: Student[]): jsPDF => {
   doc.setFontSize(10);
   doc.text(`Generated on ${new Date().toLocaleString()}`, 14, 22);
   
-  // Create table in PDF
-  (doc as any).autoTable({
+  // Create table in PDF with extremely small font size to fit all columns
+  autoTable(doc, {
+    head: [tableColumn],
+    body: tableRows,
     startY: 30,
-    columns: columns,
-    body: rows,
-    styles: { overflow: 'linebreak' },
-    headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+    styles: { 
+      overflow: 'linebreak',
+      fontSize: 6, // Very small font to fit all columns
+      cellPadding: 1  // Minimal padding
+    },
+    headStyles: { 
+      fillColor: [41, 128, 185], 
+      textColor: 255,
+      fontSize: 6 // Very small font for headers
+    },
     alternateRowStyles: { fillColor: [242, 242, 242] },
-    margin: { top: 30 },
+    margin: { top: 30, left: 5, right: 5 }, // Minimal margins
+    // Set column styles and widths to optimize space
+    columnStyles: {
+      0: { cellWidth: 12 }, // Sl No
+      1: { cellWidth: 25 }, // Name
+      2: { cellWidth: 20 }, // Student ID
+      3: { cellWidth: 20 }, // Phone
+      4: { cellWidth: 12 }, // Gender
+      5: { cellWidth: 15 }, // Batch
+      6: { cellWidth: 20 }, // Class Teacher
+      // Let the remaining columns auto-size, but with a preference for making them narrow
+      19: { cellWidth: 18 }, // Remarks (a bit wider for text)
+      20: { cellWidth: 18 }, // Remarks 1
+      21: { cellWidth: 18 }, // Remarks 2
+      22: { cellWidth: 18 }, // Remarks 3
+      23: { cellWidth: 18 }, // Remarks 4
+    },
+    didDrawPage: (data) => {
+      // Add a footer with pagination
+      const str = `Page ${data.pageNumber} of ${doc.getNumberOfPages()}`;
+      doc.setFontSize(8);
+      doc.text(str, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+    }
   });
   
   return doc;
@@ -354,31 +417,18 @@ export const hoursToCSV = (hours: any[]): string => {
 export const hoursToPDF = (hours: any[]): jsPDF => {
   const doc = new jsPDF('landscape');
   
-  // Define columns for PDF table
-  const columns = [
-    { header: 'Batch', dataKey: 'batch' },
-    { header: 'Subject', dataKey: 'subject' },
-    { header: 'Chapter', dataKey: 'chapter' },
-    { header: 'Mode', dataKey: 'mode' },
-    { header: 'Class Teacher', dataKey: 'classTeacher' },
-    { header: 'Status', dataKey: 'status' },
-    { header: 'Alloted Hrs', dataKey: 'allotedHours' },
-    { header: 'Completed Hrs', dataKey: 'completedHours' },
-    { header: 'Remaining Hrs', dataKey: 'remainingHours' }
-  ];
-  
-  // Convert hours to rows for PDF
-  const rows = hours.map(hour => ({
-    batch: hour.batch,
-    subject: hour.subject,
-    chapter: hour.chapter,
-    mode: hour.mode,
-    classTeacher: hour.classTeacher,
-    status: hour.chapterStatus,
-    allotedHours: hour.allotedHours,
-    completedHours: hour.completedHours,
-    remainingHours: hour.remainingHours || (hour.allotedHours - hour.completedHours)
-  }));
+  const tableColumn = ['Batch', 'Subject', 'Chapter', 'Mode', 'Class Teacher', 'Status', 'Alloted Hrs', 'Completed Hrs', 'Remaining Hrs'];
+  const tableRows = hours.map(hour => [
+    hour.batch,
+    hour.subject,
+    hour.chapter,
+    hour.mode,
+    hour.classTeacher,
+    hour.chapterStatus,
+    hour.allotedHours,
+    hour.completedHours,
+    hour.remainingHours || (hour.allotedHours - hour.completedHours)
+  ]);
   
   // Add title to PDF
   doc.setFontSize(16);
@@ -387,10 +437,10 @@ export const hoursToPDF = (hours: any[]): jsPDF => {
   doc.text(`Generated on ${new Date().toLocaleString()}`, 14, 22);
   
   // Create table in PDF
-  (doc as any).autoTable({
+  autoTable(doc, {
+    head: [tableColumn],
+    body: tableRows,
     startY: 30,
-    columns: columns,
-    body: rows,
     styles: { overflow: 'linebreak' },
     headStyles: { fillColor: [41, 128, 185], textColor: 255 },
     alternateRowStyles: { fillColor: [242, 242, 242] },
@@ -493,7 +543,7 @@ export const hourStatsToPDF = (stats: any): jsPDF => {
     doc.text('Overall Statistics', 14, yPosition);
     yPosition += 10;
     
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPosition,
       head: [['Metric', 'Value']],
       body: [
@@ -509,7 +559,9 @@ export const hourStatsToPDF = (stats: any): jsPDF => {
       alternateRowStyles: { fillColor: [242, 242, 242] },
     });
     
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
+    // Get the last Y position after the table is rendered
+    const lastAutoTable = doc.lastAutoTable;
+    yPosition = lastAutoTable ? lastAutoTable.finalY + 15 : yPosition + 70;
   }
   
   // Add subject stats
@@ -518,31 +570,25 @@ export const hourStatsToPDF = (stats: any): jsPDF => {
     doc.text('Subject Statistics', 14, yPosition);
     yPosition += 10;
     
-    const columns = [
-      { header: 'Subject', dataKey: 'subject' },
-      { header: 'Alloted Hours', dataKey: 'allotedHours' },
-      { header: 'Completed Hours', dataKey: 'completedHours' },
-      { header: 'Remaining Hours', dataKey: 'remainingHours' },
-      { header: 'Completion %', dataKey: 'completionPercentage' }
-    ];
+    const subjectRows = stats.subjectStats.map((stat: any) => [
+      stat.subject,
+      stat.totalAllotedHours,
+      stat.totalCompletedHours,
+      stat.totalRemainingHours,
+      `${stat.completionPercentage.toFixed(2)}%`
+    ]);
     
-    const rows = stats.subjectStats.map((stat: any) => ({
-      subject: stat.subject,
-      allotedHours: stat.totalAllotedHours,
-      completedHours: stat.totalCompletedHours,
-      remainingHours: stat.totalRemainingHours,
-      completionPercentage: `${stat.completionPercentage.toFixed(2)}%`
-    }));
-    
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPosition,
-      columns: columns,
-      body: rows,
+      head: [['Subject', 'Alloted Hours', 'Completed Hours', 'Remaining Hours', 'Completion %']],
+      body: subjectRows,
       headStyles: { fillColor: [41, 128, 185], textColor: 255 },
       alternateRowStyles: { fillColor: [242, 242, 242] },
     });
     
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
+    // Get the last Y position after the table is rendered
+    const lastAutoTable = doc.lastAutoTable;
+    yPosition = lastAutoTable ? lastAutoTable.finalY + 15 : yPosition + 70;
   }
   
   // Add a new page if needed
@@ -557,28 +603,19 @@ export const hourStatsToPDF = (stats: any): jsPDF => {
     doc.text('Batch Statistics', 14, yPosition);
     yPosition += 10;
     
-    const columns = [
-      { header: 'Batch', dataKey: 'batch' },
-      { header: 'Subject', dataKey: 'subject' },
-      { header: 'Alloted', dataKey: 'allotedHours' },
-      { header: 'Completed', dataKey: 'completedHours' },
-      { header: 'Remaining', dataKey: 'remainingHours' },
-      { header: 'Completion %', dataKey: 'completionPercentage' }
-    ];
+    const batchRows = stats.batchStats.map((stat: any) => [
+      stat.batch,
+      stat.subject,
+      stat.totalAllotedHours,
+      stat.totalCompletedHours,
+      stat.totalRemainingHours,
+      `${stat.completionPercentage.toFixed(2)}%`
+    ]);
     
-    const rows = stats.batchStats.map((stat: any) => ({
-      batch: stat.batch,
-      subject: stat.subject,
-      allotedHours: stat.totalAllotedHours,
-      completedHours: stat.totalCompletedHours,
-      remainingHours: stat.totalRemainingHours,
-      completionPercentage: `${stat.completionPercentage.toFixed(2)}%`
-    }));
-    
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPosition,
-      columns: columns,
-      body: rows,
+      head: [['Batch', 'Subject', 'Alloted', 'Completed', 'Remaining', 'Completion %']],
+      body: batchRows,
       headStyles: { fillColor: [41, 128, 185], textColor: 255 },
       alternateRowStyles: { fillColor: [242, 242, 242] },
     });

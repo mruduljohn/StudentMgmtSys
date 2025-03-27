@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import Layout from '../components/layout/Layout';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
-import axios, { testBackup, deleteBackup } from '../api';
+import axios, { testBackup, deleteBackup, restoreBackup } from '../api';
 import { useAuthStore } from '../store/authStore';
 import { format, parseISO } from 'date-fns';
 import { FaDownload, FaUpload, FaDatabase, FaCalendarAlt, FaCheck, FaTimes, FaTrash, FaClock } from 'react-icons/fa';
@@ -39,6 +39,7 @@ const DatabaseBackup: React.FC = () => {
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<string>(new Date().toLocaleString());
+  const [isLoading, setIsLoading] = useState(false);
 
   // Redirect if not admin
   useEffect(() => {
@@ -176,19 +177,57 @@ const DatabaseBackup: React.FC = () => {
     }
 
     try {
-      const formData = new FormData();
-      formData.append('backup', uploadFile);
+      setIsLoading(true);
+      toast.loading('Processing backup file. This may take a few minutes for large databases...', {
+        duration: 5000 // Show for 5 seconds initially
+      });
       
-      const response = await axios.post('/backup/restore?confirm=true', formData);
-      toast.success('Database restored successfully');
+      // Use the API function
+      await restoreBackup(uploadFile);
+      
+      // Success!
+      toast.dismiss(); // Clear any existing toasts
+      toast.success('Database restored successfully!');
+      
       setShowUploadModal(false);
       setUploadFile(null);
       setConfirmRestore(false);
       setBackupInfo(null);
+      
+      // Refresh the backup list
       fetchBackups();
     } catch (err: any) {
       console.error('Error restoring backup:', err);
-      toast.error(err.response?.data?.message || 'Failed to restore backup');
+      toast.dismiss(); // Clear any existing toasts
+      
+      // Provide detailed error messages based on the error type
+      let errorMessage = 'Failed to restore backup';
+      
+      if (err.response) {
+        // The server responded with an error status code
+        if (err.response.status === 400) {
+          errorMessage = err.response.data?.message || 'Invalid backup file format';
+        } else if (err.response.status === 403) {
+          errorMessage = 'Permission denied. Only administrators can restore backups.';
+        } else if (err.response.status === 413) {
+          errorMessage = 'Backup file is too large. Maximum size is 50MB.';
+        } else if (err.response.status === 500) {
+          errorMessage = err.response.data?.message || 
+                         'Server error during restore. The backup may be corrupted or incompatible with the current version.';
+        } else {
+          errorMessage = err.response.data?.message || errorMessage;
+        }
+      } else if (err.request) {
+        // The request was made but no response was received
+        errorMessage = 'No response from server. Please check your network connection or the server status.';
+      } else if (err.message && err.message.includes('timeout')) {
+        // Timeout error
+        errorMessage = 'The restore operation timed out. The backup file may be too large.';
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 

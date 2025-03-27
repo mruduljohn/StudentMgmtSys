@@ -11,8 +11,8 @@ import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
 import { hoursToExcel, downloadExcel, hoursToCSV, downloadCSV, hoursToPDF, downloadPDF, hourStatsToExcel, hourStatsToCSV, hourStatsToPDF } from '../utils/excelUtils';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import Menu from '../components/ui/Menu';
 import FileNamePrompt from '../components/ui/FileNamePrompt';
 
@@ -244,7 +244,7 @@ const HourDashboard: React.FC = observer(() => {
             doc.setFontSize(16);
             doc.text(`Chapter Status - ${selectedSubject} (${selectedBatch})`, 14, 15);
             
-            (doc as any).autoTable({
+            autoTable(doc, {
               startY: 25,
               head: [['Chapter', 'Status', 'Alloted Hours', 'Completed Hours', 'Remaining Hours']],
               body: chapters.map(chapter => [

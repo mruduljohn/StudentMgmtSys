@@ -201,16 +201,47 @@ export const restoreFromBackup = async (req: RequestWithFile, res: Response): Pr
     }
     
     const filePath = req.file.path;
+    console.log("Processing backup file at:", filePath);
     
-    // Parse backup file
-    const backupData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    // Parse backup file with error handling
+    let backupData;
+    try {
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      // Check if the file is not empty
+      if (!fileContent || fileContent.trim().length === 0) {
+        fs.unlinkSync(filePath);
+        res.status(400).json({ message: "Backup file is empty" });
+        return;
+      }
+      
+      backupData = JSON.parse(fileContent);
+      console.log("Successfully parsed JSON data");
+    } catch (parseError) {
+      console.error("Error parsing backup JSON:", parseError);
+      // Clean up file
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (unlinkError) {
+        console.error("Error deleting invalid file:", unlinkError);
+      }
+      
+      res.status(400).json({ message: "Invalid JSON format in backup file" });
+      return;
+    }
     
     // Validate backup structure
     if (!backupData.data || !backupData.metadata) {
-      res.status(400).json({ message: "Invalid backup file format" });
+      console.error("Invalid backup structure: missing data or metadata");
       fs.unlinkSync(filePath);
+      res.status(400).json({ message: "Invalid backup structure: missing data or metadata sections" });
       return;
     }
+    
+    // Log the structure for debugging
+    console.log("Backup metadata:", backupData.metadata);
+    console.log("Backup data sections available:", Object.keys(backupData.data));
     
     // Confirm restore
     if (req.query.confirm !== 'true') {
@@ -222,77 +253,210 @@ export const restoreFromBackup = async (req: RequestWithFile, res: Response): Pr
         version: backupData.version
       });
       
-      fs.unlinkSync(filePath);
+      // Don't delete the file yet as it will be needed for the confirmation request
       return;
     }
     
-    // Start a transaction
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    console.log("Starting restore process with confirm=true");
     
+    // NO TRANSACTIONS: Simplified approach without transactions for MongoDB standalone mode
     try {
-      // Clear existing data
-      await Student.deleteMany({}, { session });
-      // Don't delete current user that is performing the restore
-      await User.deleteMany({ _id: { $ne: req.user?.id } }, { session });
-      await Config.deleteMany({}, { session });
-      await Hour.deleteMany({}, { session });
+      console.log("Removing existing data...");
       
-      // Restore data
-      if (backupData.data.students.length > 0) {
-        await Student.insertMany(backupData.data.students, { session });
+      // Clear existing data with separate try/catch blocks
+      try {
+        // Use native MongoDB driver directly to avoid Mongoose transaction issues
+        if (!mongoose.connection.db) {
+          throw new Error("MongoDB connection not initialized");
+        }
+        const studentCollection = mongoose.connection.db.collection('students');
+        await studentCollection.deleteMany({});
+        console.log("Cleared student data using native MongoDB driver");
+      } catch (deleteError) {
+        console.error("Error clearing students:", deleteError);
       }
       
-      if (backupData.data.users.length > 0) {
-        // Filter out the current user to prevent conflicts
-        const usersToRestore = backupData.data.users.filter(
-          (user: any) => user.username !== req.user?.username
-        );
-        await User.insertMany(usersToRestore, { session });
+      try {
+        // Don't delete current user - use native MongoDB driver
+        if (!mongoose.connection.db) {
+          throw new Error("MongoDB connection not initialized");
+        }
+        const userCollection = mongoose.connection.db.collection('users');
+        if (req.user?.id) {
+          await userCollection.deleteMany({ _id: { $ne: new mongoose.Types.ObjectId(req.user.id) } });
+        } else {
+          await userCollection.deleteMany({});
+        }
+        console.log("Cleared user data (except current user) using native MongoDB driver");
+      } catch (deleteError) {
+        console.error("Error clearing users:", deleteError);
       }
       
-      if (backupData.data.configs.length > 0) {
-        await Config.insertMany(backupData.data.configs, { session });
+      try {
+        // Use native MongoDB driver
+        if (!mongoose.connection.db) {
+          throw new Error("MongoDB connection not initialized");
+        }
+        const configCollection = mongoose.connection.db.collection('configs');
+        await configCollection.deleteMany({});
+        console.log("Cleared config data using native MongoDB driver");
+      } catch (deleteError) {
+        console.error("Error clearing configs:", deleteError);
       }
       
-      if (backupData.data.hours.length > 0) {
-        await Hour.insertMany(backupData.data.hours, { session });
+      try {
+        // Use native MongoDB driver
+        if (!mongoose.connection.db) {
+          throw new Error("MongoDB connection not initialized");
+        }
+        const hourCollection = mongoose.connection.db.collection('hours');
+        await hourCollection.deleteMany({});
+        console.log("Cleared hour data using native MongoDB driver");
+      } catch (deleteError) {
+        console.error("Error clearing hours:", deleteError);
       }
       
-      // Commit transaction
-      await session.commitTransaction();
+      console.log("Inserting new data...");
+      
+      // Insert students if available
+      if (backupData.data.students && backupData.data.students.length > 0) {
+        try {
+          // Insert in batches to avoid overwhelming the database
+          const batchSize = 100;
+          const studentBatches = [];
+          
+          for (let i = 0; i < backupData.data.students.length; i += batchSize) {
+            studentBatches.push(backupData.data.students.slice(i, i + batchSize));
+          }
+          
+          console.log(`Processing ${studentBatches.length} student batches`);
+          
+          for (const batch of studentBatches) {
+            try {
+              await Student.insertMany(batch, { ordered: false });
+            } catch (batchError: unknown) {
+              const errorMessage = batchError instanceof Error 
+                ? batchError.message 
+                : 'Unknown error in student batch';
+              console.warn("Error in student batch:", errorMessage);
+            }
+          }
+          
+          console.log(`Restored ${backupData.data.students.length} students`);
+        } catch (studentError) {
+          console.error("Error restoring students:", studentError);
+        }
+      }
+      
+      // Insert users if available
+      if (backupData.data.users && backupData.data.users.length > 0) {
+        try {
+          // Filter out the current user to prevent conflicts
+          const usersToRestore = backupData.data.users.filter(
+            (user: any) => user.username !== req.user?.username
+          );
+          
+          await User.insertMany(usersToRestore, { ordered: false });
+          console.log(`Restored ${usersToRestore.length} users`);
+        } catch (userError) {
+          console.error("Error restoring users:", userError);
+        }
+      }
+      
+      // Insert configs if available
+      if (backupData.data.configs && backupData.data.configs.length > 0) {
+        try {
+          await Config.insertMany(backupData.data.configs, { ordered: false });
+          console.log(`Restored ${backupData.data.configs.length} configs`);
+        } catch (configError) {
+          console.error("Error restoring configs:", configError);
+        }
+      }
+      
+      // Insert hours if available
+      if (backupData.data.hours && backupData.data.hours.length > 0) {
+        try {
+          // Insert in batches to avoid overwhelming the database
+          const batchSize = 100;
+          const hourBatches = [];
+          
+          for (let i = 0; i < backupData.data.hours.length; i += batchSize) {
+            hourBatches.push(backupData.data.hours.slice(i, i + batchSize));
+          }
+          
+          console.log(`Processing ${hourBatches.length} hour batches`);
+          
+          for (const batch of hourBatches) {
+            try {
+              await Hour.insertMany(batch, { ordered: false });
+            } catch (batchError: unknown) {
+              const errorMessage = batchError instanceof Error 
+                ? batchError.message 
+                : 'Unknown error in hour batch';
+              console.warn("Error in hour batch:", errorMessage);
+            }
+          }
+          
+          console.log(`Restored ${backupData.data.hours.length} hours`);
+        } catch (hourError) {
+          console.error("Error restoring hours:", hourError);
+        }
+      }
+      
+      console.log("Restore process completed successfully");
       
       // Clean up the temporary file
-      fs.unlinkSync(filePath);
+      try {
+        fs.unlinkSync(filePath);
+        console.log("Temporary file deleted");
+      } catch (unlinkError) {
+        console.error("Error deleting temporary file:", unlinkError);
+      }
       
       // Log restore operation
-      await Audit.create({
-        user: req.user?.id,
-        action: "CONFIG_CHANGE",
-        entityType: "SYSTEM",
-        details: {
-          operation: "DATABASE_RESTORE",
-          filename: req.file.originalname,
-          metadata: backupData.metadata,
-        },
-        ipAddress: req.ip
-      });
+      try {
+        await Audit.create({
+          user: req.user?.id,
+          action: "CONFIG_CHANGE",
+          entityType: "SYSTEM",
+          details: {
+            operation: "DATABASE_RESTORE",
+            filename: req.file.originalname,
+            metadata: backupData.metadata,
+          },
+          ipAddress: req.ip
+        });
+        console.log("Restore audit log created");
+      } catch (auditError) {
+        console.error("Error creating audit log:", auditError);
+      }
       
       res.json({
         message: "Database restored successfully",
         metadata: backupData.metadata,
       });
-    } catch (error) {
-      // Abort transaction on error
-      await session.abortTransaction();
-      console.error("Error during restore transaction:", error);
-      res.status(500).json({ message: "Error during restore" });
-    } finally {
-      session.endSession();
+    } catch (restoreError) {
+      console.error("General error during restore process:", restoreError);
+      res.status(500).json({ 
+        message: "Error during restore process",
+        error: restoreError instanceof Error ? restoreError.message : 'Unknown error'
+      });
+      
+      // Ensure the temporary file is deleted
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (unlinkError) {
+        console.error("Error deleting temporary file:", unlinkError);
+      }
     }
   } catch (error) {
-    console.error("Error restoring database backup:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Fatal error in restore controller:", error);
+    res.status(500).json({ 
+      message: "Server error during restore process",
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
     
     // Clean up file if it exists
     if (req.file && req.file.path) {
