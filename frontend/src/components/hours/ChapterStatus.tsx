@@ -30,6 +30,9 @@ interface ChapterData {
   status: string;
   progress: number;
   totalHours: number;
+  allotedHours: number;
+  completedHours: number;
+  remainingHours: number;
   lastUpdated: string;
 }
 
@@ -67,12 +70,12 @@ const ChapterStatus: React.FC<ChapterStatusProps> = observer(({ batch, subject }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'NOT STARTED':
-        return 'error';
-      case 'ONGOING':
-        return 'warning';
       case 'COMPLETED':
         return 'success';
+      case 'ONGOING':
+        return 'warning';
+      case 'NOT STARTED':
+        return 'default';
       default:
         return 'default';
     }
@@ -240,7 +243,13 @@ const ChapterStatus: React.FC<ChapterStatusProps> = observer(({ batch, subject }
                         Subject: {subject}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Total Hours: {chapter.totalHours}
+                        Alloted Hours: {chapter.allotedHours}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Completed Hours: {chapter.completedHours}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Remaining Hours: {chapter.remainingHours}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Last Updated: {new Date(chapter.lastUpdated).toLocaleDateString()}

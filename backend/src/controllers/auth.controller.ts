@@ -185,6 +185,9 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
     // Update class if user is a MENTOR
     if (role === "MENTOR" || user.role === "MENTOR") {
       user.class = assignedClass || user.class;
+    } else {
+      // Clear class when role is ADMIN
+      user.class = undefined;
     }
 
     // Save updated user
@@ -328,6 +331,27 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
       if (req.user?.role !== "ADMIN") {
         res.status(403).json({ message: "Only administrators can reset other users' passwords" });
         return;
+      }
+      
+      // If resetting another admin's password, current password is required for verification
+      if (user.role === "ADMIN" && !currentPassword) {
+        res.status(400).json({ message: "Your current password is required to reset another admin's password" });
+        return;
+      }
+      
+      if (user.role === "ADMIN" && currentPassword) {
+        // Verify admin's password
+        const adminUser = await User.findById(req.user.id);
+        if (!adminUser) {
+          res.status(404).json({ message: "Admin user not found" });
+          return;
+        }
+        
+        const isAdminPasswordValid = await bcrypt.compare(currentPassword, adminUser.password);
+        if (!isAdminPasswordValid) {
+          res.status(401).json({ message: "Your current password is incorrect" });
+          return;
+        }
       }
     }
     

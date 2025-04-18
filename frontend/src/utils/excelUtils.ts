@@ -10,6 +10,19 @@ interface ExcelRow {
   [key: string]: string | number | boolean | undefined;
 }
 
+// Define types for custom labels
+interface CustomLabels {
+  remarks?: string;
+  remarks1?: string;
+  remarks2?: string;
+  remarks3?: string;
+  remarks4?: string;
+  flag1?: string;
+  flag2?: string;
+  flag3?: string;
+  flag4?: string;
+}
+
 // Convert Excel data to Student objects
 export const excelToStudents = (data: ArrayBuffer): Student[] => {
   const workbook = XLSX.read(data, { type: 'array' });
@@ -136,7 +149,10 @@ export const excelToStudents = (data: ArrayBuffer): Student[] => {
 };
 
 // Convert Student objects to Excel data
-export const studentsToExcel = (students: Student[]): ArrayBuffer => {
+export const studentsToExcel = (
+  students: Student[], 
+  customLabels: CustomLabels = {}
+): ArrayBuffer => {
   const worksheet = XLSX.utils.json_to_sheet(students.map(student => ({
     'Sl No': student.slNo,
     'NAME': student.name,
@@ -156,16 +172,16 @@ export const studentsToExcel = (students: Student[]): ArrayBuffer => {
     'Syllabus': student.syllabus,
     'Percentage of +2 Marks': student.percentageOfPlus2Marks,
     'NEET Score': student.neetScore,
-    'Remarks': student.remarks,
-    'Remarks 1': student.remarks1,
-    'Remarks 2': student.remarks2,
-    'Remarks 3': student.remarks3,
-    'Remarks 4': student.remarks4,
+    [customLabels.remarks || 'Remarks']: student.remarks,
+    [customLabels.remarks1 || 'Remarks 1']: student.remarks1,
+    [customLabels.remarks2 || 'Remarks 2']: student.remarks2,
+    [customLabels.remarks3 || 'Remarks 3']: student.remarks3,
+    [customLabels.remarks4 || 'Remarks 4']: student.remarks4,
     'Fee Due': student.feeDue,
-    'Flag1': student.flag1,
-    'Flag2': student.flag2,
-    'Flag3': student.flag3,
-    'Flag4': student.flag4,
+    [customLabels.flag1 || 'Flag 1']: student.flag1,
+    [customLabels.flag2 || 'Flag 2']: student.flag2,
+    [customLabels.flag3 || 'Flag 3']: student.flag3,
+    [customLabels.flag4 || 'Flag 4']: student.flag4,
   })));
   
   const workbook = XLSX.utils.book_new();
@@ -175,7 +191,10 @@ export const studentsToExcel = (students: Student[]): ArrayBuffer => {
 };
 
 // Convert Student objects to CSV data
-export const studentsToCSV = (students: Student[]): string => {
+export const studentsToCSV = (
+  students: Student[],
+  customLabels: CustomLabels = {}
+): string => {
   const worksheet = XLSX.utils.json_to_sheet(students.map(student => ({
     'Sl No': student.slNo,
     'NAME': student.name,
@@ -195,25 +214,39 @@ export const studentsToCSV = (students: Student[]): string => {
     'Syllabus': student.syllabus,
     'Percentage of +2 Marks': student.percentageOfPlus2Marks,
     'NEET Score': student.neetScore,
-    'Remarks': student.remarks,
-    'Remarks 1': student.remarks1,
-    'Remarks 2': student.remarks2,
-    'Remarks 3': student.remarks3,
-    'Remarks 4': student.remarks4,
+    [customLabels.remarks || 'Remarks']: student.remarks,
+    [customLabels.remarks1 || 'Remarks 1']: student.remarks1,
+    [customLabels.remarks2 || 'Remarks 2']: student.remarks2,
+    [customLabels.remarks3 || 'Remarks 3']: student.remarks3,
+    [customLabels.remarks4 || 'Remarks 4']: student.remarks4,
     'Fee Due': student.feeDue,
-    'Flag1': student.flag1,
-    'Flag2': student.flag2,
-    'Flag3': student.flag3,
-    'Flag4': student.flag4,
+    [customLabels.flag1 || 'Flag 1']: student.flag1,
+    [customLabels.flag2 || 'Flag 2']: student.flag2,
+    [customLabels.flag3 || 'Flag 3']: student.flag3,
+    [customLabels.flag4 || 'Flag 4']: student.flag4,
   })));
   
   return XLSX.utils.sheet_to_csv(worksheet);
 };
 
 // Convert Student objects to PDF data
-export const studentsToPDF = (students: Student[]): jsPDF => {
+export const studentsToPDF = (
+  students: Student[],
+  customLabels: CustomLabels = {}
+): jsPDF => {
   // Use landscape orientation with larger page size to fit all columns
   const doc = new jsPDF('landscape');
+  
+  // Get custom label values with defaults
+  const remarksLabel = customLabels.remarks || 'Remarks';
+  const remarks1Label = customLabels.remarks1 || 'Remarks 1';
+  const remarks2Label = customLabels.remarks2 || 'Remarks 2';
+  const remarks3Label = customLabels.remarks3 || 'Remarks 3';
+  const remarks4Label = customLabels.remarks4 || 'Remarks 4';
+  const flag1Label = customLabels.flag1 || 'Flag 1';
+  const flag2Label = customLabels.flag2 || 'Flag 2';
+  const flag3Label = customLabels.flag3 || 'Flag 3';
+  const flag4Label = customLabels.flag4 || 'Flag 4';
   
   // Define columns for PDF table - include all student fields
   const tableColumn = [
@@ -236,15 +269,15 @@ export const studentsToPDF = (students: Student[]): jsPDF => {
     '+2 Marks %',
     'NEET Score',
     'Fee Due',
-    'Remarks',
-    'Remarks 1',
-    'Remarks 2',
-    'Remarks 3',
-    'Remarks 4',
-    'Flag 1',
-    'Flag 2',
-    'Flag 3',
-    'Flag 4'
+    remarksLabel,
+    remarks1Label,
+    remarks2Label,
+    remarks3Label,
+    remarks4Label,
+    flag1Label,
+    flag2Label,
+    flag3Label,
+    flag4Label
   ];
   
   // Convert students to rows for PDF - include all fields
@@ -285,44 +318,26 @@ export const studentsToPDF = (students: Student[]): jsPDF => {
   doc.setFontSize(10);
   doc.text(`Generated on ${new Date().toLocaleString()}`, 14, 22);
   
-  // Create table in PDF with extremely small font size to fit all columns
-  autoTable(doc, {
+  // Add table with autoTable
+  autoTable(doc, { 
     head: [tableColumn],
     body: tableRows,
     startY: 30,
-    styles: { 
-      overflow: 'linebreak',
-      fontSize: 6, // Very small font to fit all columns
-      cellPadding: 1  // Minimal padding
-    },
-    headStyles: { 
-      fillColor: [41, 128, 185], 
-      textColor: 255,
-      fontSize: 6 // Very small font for headers
-    },
-    alternateRowStyles: { fillColor: [242, 242, 242] },
-    margin: { top: 30, left: 5, right: 5 }, // Minimal margins
-    // Set column styles and widths to optimize space
+    theme: 'grid',
+    headStyles: { fillColor: [66, 66, 66] },
+    styles: { overflow: 'linebreak', cellWidth: 'auto', fontSize: 8 },
     columnStyles: {
-      0: { cellWidth: 12 }, // Sl No
-      1: { cellWidth: 25 }, // Name
-      2: { cellWidth: 20 }, // Student ID
-      3: { cellWidth: 20 }, // Phone
-      4: { cellWidth: 12 }, // Gender
-      5: { cellWidth: 15 }, // Batch
-      6: { cellWidth: 20 }, // Class Teacher
-      // Let the remaining columns auto-size, but with a preference for making them narrow
-      19: { cellWidth: 18 }, // Remarks (a bit wider for text)
-      20: { cellWidth: 18 }, // Remarks 1
-      21: { cellWidth: 18 }, // Remarks 2
-      22: { cellWidth: 18 }, // Remarks 3
-      23: { cellWidth: 18 }, // Remarks 4
-    },
-    didDrawPage: (data) => {
-      // Add a footer with pagination
-      const str = `Page ${data.pageNumber} of ${doc.getNumberOfPages()}`;
-      doc.setFontSize(8);
-      doc.text(str, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+      // Set narrower width for certain columns to improve fit
+      0: { cellWidth: 10 }, // Sl. No
+      3: { cellWidth: 25 }, // Phone
+      4: { cellWidth: 15 }, // Gender
+      12: { cellWidth: 15 }, // ID Card
+      13: { cellWidth: 15 }, // Tab
+      14: { cellWidth: 20 }, // Joined
+      15: { cellWidth: 20 }, // Syllabus
+      16: { cellWidth: 20 }, // +2 Marks %
+      17: { cellWidth: 20 }, // NEET Score
+      18: { cellWidth: 15 }, // Fee Due
     }
   });
   
@@ -369,6 +384,7 @@ export const hoursToExcel = (hours: any[]): ArrayBuffer => {
     'Mode': hour.mode,
     'Class Teacher': hour.classTeacher,
     'Status': hour.chapterStatus,
+    'Exam Date': hour.date,
     'Alloted Hours': hour.allotedHours,
     'Completed Hours': hour.completedHours,
     'Remaining Hours': hour.remainingHours,
@@ -397,6 +413,7 @@ export const hoursToCSV = (hours: any[]): string => {
     'Mode': hour.mode,
     'Class Teacher': hour.classTeacher,
     'Status': hour.chapterStatus,
+    'Exam Date': hour.date,
     'Alloted Hours': hour.allotedHours,
     'Completed Hours': hour.completedHours,
     'Remaining Hours': hour.remainingHours,
@@ -417,7 +434,7 @@ export const hoursToCSV = (hours: any[]): string => {
 export const hoursToPDF = (hours: any[]): jsPDF => {
   const doc = new jsPDF('landscape');
   
-  const tableColumn = ['Batch', 'Subject', 'Chapter', 'Mode', 'Class Teacher', 'Status', 'Alloted Hrs', 'Completed Hrs', 'Remaining Hrs'];
+  const tableColumn = ['Batch', 'Subject', 'Chapter', 'Mode', 'Class Teacher', 'Status', 'Exam Date', 'Alloted Hrs', 'Completed Hrs', 'Remaining Hrs'];
   const tableRows = hours.map(hour => [
     hour.batch,
     hour.subject,
@@ -425,6 +442,7 @@ export const hoursToPDF = (hours: any[]): jsPDF => {
     hour.mode,
     hour.classTeacher,
     hour.chapterStatus,
+    hour.examDate,
     hour.allotedHours,
     hour.completedHours,
     hour.remainingHours || (hour.allotedHours - hour.completedHours)

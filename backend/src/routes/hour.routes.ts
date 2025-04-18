@@ -1,4 +1,5 @@
 import express from "express";
+import multer from "multer";
 import {
   getAllHours,
   getHourById,
@@ -7,11 +8,16 @@ import {
   deleteHour,
   getHourStats,
   getChapterStatus,
-  getHourOptions
+  getHourOptions,
+  uploadHoursCSV
 } from "../controllers/hour.controller";
 import { authMiddleware, adminOnly, mentorOrAdmin } from "../middlewares/auth.middleware";
 
 const router = express.Router();
+
+// Configure multer for file uploads
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 /**
  * @swagger
@@ -324,5 +330,41 @@ router.put("/hours/:id", authMiddleware, mentorOrAdmin, updateHour);
  *         description: Server error
  */
 router.delete("/hours/:id", authMiddleware, mentorOrAdmin, deleteHour);
+
+/**
+ * @swagger
+ * /hours/upload/csv:
+ *   post:
+ *     summary: Upload hours data from CSV file
+ *     tags: [Hours]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: mode
+ *         schema:
+ *           type: string
+ *           enum: [new, update, both]
+ *         description: Upload mode - 'new' for only new entries, 'update' for updating existing entries, 'both' for both operations
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: CSV processed successfully
+ *       400:
+ *         description: Invalid request
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.post("/hours/upload/csv", authMiddleware, adminOnly, upload.single('file'), uploadHoursCSV);
 
 export default router; 

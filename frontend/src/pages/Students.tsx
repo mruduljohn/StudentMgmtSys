@@ -770,43 +770,53 @@ const Students: React.FC = observer(() => {
   const prepareExportData = (type: 'all' | 'filtered' | 'selected'): void => {
     setExportType(type);
     let students: Student[] = [];
-    let defaultName = '';
-    
-    switch (type) {
-      case 'all':
-        students = studentStore.getAllStudents;
-        defaultName = `all-students-${new Date().toISOString().slice(0, 10)}`;
-        break;
-      case 'filtered':
-        students = studentStore.getStudents;
-        defaultName = `filtered-students-${new Date().toISOString().slice(0, 10)}`;
-        break;
-      case 'selected':
-        students = studentStore.getAllStudents.filter(student => 
-          selectedRows.includes(student.studentId)
-        );
-        defaultName = `selected-students-${new Date().toISOString().slice(0, 10)}`;
-        break;
+
+    // Determine which students to export
+    if (type === 'all') {
+      students = studentStore.getAllStudents;
+    } else if (type === 'filtered') {
+      students = studentStore.getStudents;
+    } else if (type === 'selected') {
+      students = studentStore.getAllStudents.filter(student => 
+        selectedRows.includes(student.studentId)
+      );
     }
-    
+
     if (students.length === 0) {
       showErrorMessage('No students to export');
       return;
     }
+
+    // Generate a default filename based on the export type
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const defaultName = `students-${type}-${timestamp}`;
+    
+    // Get custom labels from the store for remarks and flags
+    const customLabels = {
+      remarks: studentStore.remarksConfig.remarks,
+      remarks1: studentStore.remarksConfig.remarks1,
+      remarks2: studentStore.remarksConfig.remarks2,
+      remarks3: studentStore.remarksConfig.remarks3,
+      remarks4: studentStore.remarksConfig.remarks4,
+      flag1: studentStore.flagsConfig.flag1,
+      flag2: studentStore.flagsConfig.flag2,
+      flag3: studentStore.flagsConfig.flag3,
+      flag4: studentStore.flagsConfig.flag4
+    };
     
     try {
       if (exportFormat === 'xlsx') {
-        const excelData = studentsToExcel(students);
+        const excelData = studentsToExcel(students, customLabels);
         setExportData(excelData);
         setExportDefaultFilename(defaultName);
         setIsFileNamePromptOpen(true);
       } else if (exportFormat === 'csv') {
-        const csvData = studentsToCSV(students);
+        const csvData = studentsToCSV(students, customLabels);
         setExportData(csvData);
         setExportDefaultFilename(defaultName);
         setIsFileNamePromptOpen(true);
       } else if (exportFormat === 'pdf') {
-        const pdfDoc = studentsToPDF(students);
+        const pdfDoc = studentsToPDF(students, customLabels);
         setExportData(pdfDoc);
         setExportDefaultFilename(defaultName);
         setIsFileNamePromptOpen(true);

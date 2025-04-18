@@ -96,17 +96,30 @@ const ImportExport: React.FC = () => {
         return;
       }
       
+      // Get custom labels from the store for remarks and flags
+      const customLabels = {
+        remarks: studentStore.remarksConfig.remarks,
+        remarks1: studentStore.remarksConfig.remarks1,
+        remarks2: studentStore.remarksConfig.remarks2,
+        remarks3: studentStore.remarksConfig.remarks3,
+        remarks4: studentStore.remarksConfig.remarks4,
+        flag1: studentStore.flagsConfig.flag1,
+        flag2: studentStore.flagsConfig.flag2,
+        flag3: studentStore.flagsConfig.flag3,
+        flag4: studentStore.flagsConfig.flag4
+      };
+      
       try {
         if (exportFormat === 'xlsx') {
-          const excelData = studentsToExcel(studentStore.getAllStudents);
+          const excelData = studentsToExcel(studentStore.getAllStudents, customLabels);
           setExportData(excelData);
           setIsFileNamePromptOpen(true);
         } else if (exportFormat === 'csv') {
-          const csvData = studentsToCSV(studentStore.getAllStudents);
+          const csvData = studentsToCSV(studentStore.getAllStudents, customLabels);
           setExportData(csvData);
           setIsFileNamePromptOpen(true);
         } else if (exportFormat === 'pdf') {
-          const pdfDoc = studentsToPDF(studentStore.getAllStudents);
+          const pdfDoc = studentsToPDF(studentStore.getAllStudents, customLabels);
           // For PDF we'll just save directly as it handles its own prompts
           downloadPDF(pdfDoc, `students-export-${new Date().toISOString().slice(0, 10)}.pdf`);
           setUploadSuccess(`Successfully exported ${studentStore.getAllStudents.length} students to PDF`);

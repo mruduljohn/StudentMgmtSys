@@ -307,6 +307,8 @@ export const getAuditStats = async () => {
 
 // Hour APIs
 export const fetchHours = async (params?: Record<string, string | number | boolean | undefined>) => {
+  console.log("API fetchHours called with params:", params);
+  
   const queryParams = params ? new URLSearchParams(
     Object.entries(params)
       .filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -314,8 +316,16 @@ export const fetchHours = async (params?: Record<string, string | number | boole
   ).toString() : '';
   
   const url = `/hours${queryParams ? `?${queryParams}` : ''}`;
-  const response = await api.get(url);
-  return response.data;
+  console.log("API fetchHours requesting URL:", url);
+  
+  try {
+    const response = await api.get(url);
+    console.log("API fetchHours response data:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching hours:", error);
+    throw error;
+  }
 };
 
 export const getHourById = async (id: string) => {
@@ -335,6 +345,19 @@ export const updateHour = async (id: string, hourData: Partial<Hour>) => {
 
 export const deleteHour = async (id: string) => {
   const response = await api.delete(`/hours/${id}`);
+  return response.data;
+};
+
+export const uploadHoursCSV = async (file: File, mode: 'new' | 'update' | 'both' = 'both') => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await api.post(`/hours/upload/csv?mode=${mode}`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  
   return response.data;
 };
 
@@ -530,6 +553,50 @@ export const deleteBackup = async (filename: string) => {
     const response = await api.delete(`/backup/delete/${filename}`);
     return response.data;
   } catch (error) {
+    throw error;
+  }
+};
+
+// Dashboard PDFs APIs
+export const getDashboardPDFs = async () => {
+  try {
+    const response = await api.get('/config/dashboard-pdfs');
+    console.log("API getDashboardPDFs response:", response.data);
+    // Make sure we're returning the dashboardPDFs array from the response
+    return response.data.dashboardPDFs || [];
+  } catch (error) {
+    console.error('Error fetching dashboard PDFs:', error);
+    throw error;
+  }
+};
+
+export const uploadDashboardPDFs = async (formData: FormData) => {
+  try {
+    // Use axios directly with content-type multipart/form-data for file upload
+    const response = await api.post('/config/dashboard-pdfs', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error uploading dashboard PDFs:', error);
+    throw error;
+  }
+};
+
+export const deleteDashboardPDF = async (filePath: string) => {
+  try {
+    // Extract just the filename from the path for more reliable deletion
+    const filename = filePath.split('/').pop();
+    
+    // Using the filename for deletion is more reliable
+    console.log(`Deleting PDF with filename: ${filename}`);
+    const response = await api.delete(`/config/dashboard-pdfs/${encodeURIComponent(filename || '')}`);
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting dashboard PDF:', error);
     throw error;
   }
 };

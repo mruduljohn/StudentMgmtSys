@@ -70,6 +70,8 @@ export interface Hour {
   remarks3?: string;
   flag1?: string;
   flag2?: string;
+  flag3?: string;
+  year?: string;
   remainingHours?: number;
   createdAt?: string;
   updatedAt?: string;

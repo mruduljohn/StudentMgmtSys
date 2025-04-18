@@ -20,7 +20,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
   mode,
   onExistingStudent,
 }) => {
-  const { addStudent, updateStudent, batchConfig, fetchAllConfigs, findStudent } = useStudentStore();
+  const { addStudent, updateStudent, batchConfig, remarksConfig, flagsConfig, fetchAllConfigs, findStudent } = useStudentStore();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
   
@@ -60,7 +60,43 @@ const StudentForm: React.FC<StudentFormProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const fieldConfigs = getFieldConfigs();
+  
+  // Generate field configs with dynamic labels for remarks and flags
+  const getUpdatedFieldConfigs = () => {
+    const fieldConfigs = getFieldConfigs();
+    
+    return fieldConfigs.map(field => {
+      const updatedField = { ...field };
+      
+      // Update remark labels
+      if (field.id === 'remarks') {
+        updatedField.label = remarksConfig.remarks;
+      } else if (field.id === 'remarks1') {
+        updatedField.label = remarksConfig.remarks1;
+      } else if (field.id === 'remarks2') {
+        updatedField.label = remarksConfig.remarks2;
+      } else if (field.id === 'remarks3') {
+        updatedField.label = remarksConfig.remarks3;
+      } else if (field.id === 'remarks4') {
+        updatedField.label = remarksConfig.remarks4;
+      }
+      
+      // Update flag labels
+      else if (field.id === 'flag1') {
+        updatedField.label = flagsConfig.flag1;
+      } else if (field.id === 'flag2') {
+        updatedField.label = flagsConfig.flag2;
+      } else if (field.id === 'flag3') {
+        updatedField.label = flagsConfig.flag3;
+      } else if (field.id === 'flag4') {
+        updatedField.label = flagsConfig.flag4;
+      }
+      
+      return updatedField;
+    });
+  };
+  
+  const fieldConfigs = getUpdatedFieldConfigs();
   
   // Filter fields based on user role and mode
   const visibleFields = fieldConfigs.filter(field => {
@@ -357,7 +393,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
   
   // Add useEffect to ensure configuration data is loaded
   useEffect(() => {
-    // Ensure batch config is loaded
+    // Ensure configs are loaded
     if (
       !batchConfig.batches.length ||
       !batchConfig.teachers.length ||

@@ -111,11 +111,6 @@ const HourStats: React.FC = observer(() => {
     fill: COLORS[index % COLORS.length]
   }));
 
-  const monthlyData = stats.hoursByMonth.map((item) => ({
-    name: item.month,
-    hours: item.totalHours
-  }));
-
   return (
     <Box>
       {/* Summary Cards */}
@@ -175,33 +170,8 @@ const HourStats: React.FC = observer(() => {
       {/* Tab Panels */}
       <TabPanel value={tabValue} index={0}>
         <Grid container spacing={3}>
-          {/* Monthly Hours Chart */}
-          <Grid item xs={12}>
-            <Paper sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Monthly Hours
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <Box sx={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={monthlyData}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="hours" fill="#8884d8" name="Hours" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Box>
-            </Paper>
-          </Grid>
-
-          {/* Subject Distribution */}
-          <Grid item xs={12} md={6}>
+          {/* Distribution Charts - now in a 3-column layout */}
+          <Grid item xs={12} md={4}>
             <Paper sx={{ p: 2 }}>
               <Typography variant="h6" gutterBottom>
                 Hours by Subject
@@ -254,7 +224,7 @@ const HourStats: React.FC = observer(() => {
           </Grid>
 
           {/* Mode Distribution */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={4}>
             <Paper sx={{ p: 2 }}>
               <Typography variant="h6" gutterBottom>
                 Hours by Mode
@@ -307,7 +277,7 @@ const HourStats: React.FC = observer(() => {
           </Grid>
 
           {/* Status Distribution */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={4}>
             <Paper sx={{ p: 2 }}>
               <Typography variant="h6" gutterBottom>
                 Hours by Chapter Status

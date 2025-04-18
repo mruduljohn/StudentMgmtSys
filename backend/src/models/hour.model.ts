@@ -26,7 +26,8 @@ const hourSchema = new mongoose.Schema({
   },
   faculties: [facultySchema],
   examDate: { 
-    type: Date 
+    type: Date,
+    default: null
   },
   allotedHours: { 
     type: Number, 
@@ -93,8 +94,28 @@ const hourSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  toJSON: { 
+    virtuals: true,
+    transform: function(doc, ret) {
+      // Explicitly handle examDate field
+      if (doc.examDate instanceof Date && !isNaN(doc.examDate.getTime())) {
+        ret.examDate = doc.examDate;
+      }
+      
+      return ret;
+    }
+  },
+  toObject: { 
+    virtuals: true,
+    transform: function(doc, ret) {
+      // Explicitly handle examDate field
+      if (doc.examDate instanceof Date && !isNaN(doc.examDate.getTime())) {
+        ret.examDate = doc.examDate;
+      }
+      
+      return ret;
+    }
+  }
 });
 
 // Virtual for calculating remaining hours

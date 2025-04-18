@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
-import { Edit, Trash2, Plus, ArrowUp, ArrowDown, Download } from 'lucide-react';
+import { Edit, Trash2, Plus, ArrowUp, ArrowDown, Download, AlertTriangle, Upload, FileText, CheckSquare, Square } from 'lucide-react';
 import { useHourStore } from '../../store/hourStore';
 import { Hour } from '../../types';
 import HourModal from './HourModal';
@@ -11,6 +11,7 @@ import { hoursToExcel, downloadExcel, hoursToCSV, downloadCSV, hoursToPDF, downl
 import FileNamePrompt from '../ui/FileNamePrompt';
 import toast from 'react-hot-toast';
 import Menu from '../ui/Menu';
+import SampleHourCSV from './SampleHourCSV';
 
 const HourList: React.FC = observer(() => {
   const hourStore = useHourStore();
@@ -21,22 +22,62 @@ const HourList: React.FC = observer(() => {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isFileNamePromptOpen, setIsFileNamePromptOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | 'pdf'>('xlsx');
+  const [showSortingNotice, setShowSortingNotice] = useState(true);
+  const [selectedHours, setSelectedHours] = useState<string[]>([]);
+  const [showBulkMenu, setShowBulkMenu] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [uploadMode, setUploadMode] = useState<'new' | 'update' | 'both'>('both');
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleChangePage = (newPage: number) => {
-    hourStore.setPage(newPage);
-    hourStore.fetchHours();
+  // Show sorting notice only once per session
+  useEffect(() => {
+    if (showSortingNotice) {
+      toast.success(
+        "Sorting is being handled client-side temporarily. Backend sorting fix is in progress.",
+        { duration: 5000, icon: <AlertTriangle className="text-orange-500" /> }
+      );
+      setShowSortingNotice(false);
+    }
+  }, [showSortingNotice]);
+
+  const handleChangePage = async (newPage: number) => {
+    try {
+      // Use combined action that handles both page change and fetching
+      await hourStore.setPageAndFetch(newPage);
+      // Clear selections on page change
+      setSelectedHours([]);
+    } catch (error) {
+      console.error('Error changing page:', error);
+      toast.error('An error occurred while changing page');
+    }
   };
 
-  const handleChangeRowsPerPage = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    hourStore.setPageSize(parseInt(e.target.value, 10));
-    hourStore.setPage(1);
-    hourStore.fetchHours();
+  const handleChangeRowsPerPage = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    try {
+      const size = parseInt(e.target.value, 10);
+      // Use combined action that handles both page size change and fetching
+      await hourStore.setPageSizeAndFetch(size);
+      // Clear selections on page size change
+      setSelectedHours([]);
+    } catch (error) {
+      console.error('Error changing rows per page:', error);
+      toast.error('An error occurred while changing rows per page');
+    }
   };
 
-  const handleSort = (field: string) => {
-    const newOrder = hourStore.getSortField === field && hourStore.getSortOrder === 'asc' ? 'desc' : 'asc';
-    hourStore.setSorting(field, newOrder);
-    hourStore.fetchHours();
+  const handleSort = async (field: string) => {
+    try {
+      const newOrder = hourStore.getSortField === field && hourStore.getSortOrder === 'asc' ? 'desc' : 'asc';
+      // Use the combined action that handles both sorting and fetching
+      await hourStore.sortAndFetch(field, newOrder);
+      // Clear selections on sort
+      setSelectedHours([]);
+    } catch (error) {
+      console.error('Error sorting hours:', error);
+      toast.error('An error occurred while sorting');
+    }
   };
 
   const handleAddClick = () => {
@@ -115,6 +156,48 @@ const HourList: React.FC = observer(() => {
     );
   };
 
+  // Handle row selection
+  const handleSelectRow = (hourId: string) => {
+    setSelectedHours(prev => {
+      if (prev.includes(hourId)) {
+        return prev.filter(id => id !== hourId);
+      } else {
+        return [...prev, hourId];
+      }
+    });
+  };
+
+  // Handle select all rows
+  const handleSelectAll = () => {
+    if (selectedHours.length === hourStore.getHours.length) {
+      setSelectedHours([]);
+    } else {
+      setSelectedHours(hourStore.getHours.map(hour => hour._id as string));
+    }
+  };
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    try {
+      for (const hourId of selectedHours) {
+        await hourStore.deleteHour(hourId);
+      }
+      toast.success(`Successfully deleted ${selectedHours.length} hours`);
+      setSelectedHours([]);
+      setIsBulkDeleteDialogOpen(false);
+    } catch (error) {
+      console.error('Error deleting hours:', error);
+      toast.error('An error occurred while deleting hours');
+    }
+  };
+
+  // Handle export of selected hours
+  const handleExportSelected = (format: 'xlsx' | 'csv' | 'pdf') => {
+    setExportFormat(format);
+    setIsExportMenuOpen(false);
+    setIsFileNamePromptOpen(true);
+  };
+
   const handleExportFormat = (format: 'xlsx' | 'csv' | 'pdf') => {
     setExportFormat(format);
     setIsExportMenuOpen(false);
@@ -123,7 +206,11 @@ const HourList: React.FC = observer(() => {
   
   const handleExport = (filename: string) => {
     try {
-      const hours = hourStore.getHours;
+      // If there are selected hours, only export those
+      const hours = selectedHours.length > 0 
+        ? hourStore.getHours.filter(h => selectedHours.includes(h._id as string))
+        : hourStore.getHours;
+
       if (hours.length === 0) {
         toast.error('No hours data to export');
         return;
@@ -151,6 +238,37 @@ const HourList: React.FC = observer(() => {
     }
   };
 
+  // Handle CSV file upload
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setCsvFile(files[0]);
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleUploadCSV = async () => {
+    if (!csvFile) {
+      toast.error('Please select a CSV file');
+      return;
+    }
+
+    try {
+      await hourStore.uploadHoursCSV(csvFile, uploadMode);
+      toast.success('CSV file uploaded successfully');
+      setCsvFile(null);
+      setIsUploadModalOpen(false);
+      // Refresh hours data
+      await hourStore.fetchHours();
+    } catch (error) {
+      console.error('Error uploading CSV:', error);
+      toast.error('Failed to upload CSV file');
+    }
+  };
+
   if (hourStore.isLoading && !hourStore.getHours.length) {
     return (
       <div className="flex justify-center p-8">
@@ -164,6 +282,64 @@ const HourList: React.FC = observer(() => {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold">Hour Entries</h2>
         <div className="flex space-x-2">
+          {/* Upload CSV Button */}
+          <div className="relative">
+            <Button
+              variant="secondary"
+              onClick={() => setIsUploadModalOpen(true)}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import CSV
+            </Button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".csv"
+              className="hidden"
+            />
+          </div>
+
+          {/* Bulk Operations Menu */}
+          {selectedHours.length > 0 && (
+            <div className="relative">
+              <Button
+                variant="secondary"
+                onClick={() => setShowBulkMenu(!showBulkMenu)}
+              >
+                <CheckSquare className="h-4 w-4 mr-2" />
+                Bulk Actions ({selectedHours.length})
+              </Button>
+              
+              {showBulkMenu && (
+                <Menu
+                  items={[
+                    { 
+                      label: 'Export Selected to Excel', 
+                      onClick: () => handleExportSelected('xlsx') 
+                    },
+                    { 
+                      label: 'Export Selected to CSV', 
+                      onClick: () => handleExportSelected('csv') 
+                    },
+                    { 
+                      label: 'Export Selected to PDF', 
+                      onClick: () => handleExportSelected('pdf') 
+                    },
+                    { 
+                      label: 'Delete Selected', 
+                      onClick: () => setIsBulkDeleteDialogOpen(true),
+                      className: 'text-red-600'
+                    }
+                  ]}
+                  onClose={() => setShowBulkMenu(false)}
+                  className="right-0 mt-2"
+                />
+              )}
+            </div>
+          )}
+
+          {/* Export Menu */}
           <div className="relative">
             <Button
               variant="secondary"
@@ -200,11 +376,21 @@ const HourList: React.FC = observer(() => {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              {/* Select All Checkbox */}
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <div className="flex items-center justify-center cursor-pointer" onClick={handleSelectAll}>
+                  {selectedHours.length === hourStore.getHours.length && hourStore.getHours.length > 0 ? (
+                    <CheckSquare className="h-4 w-4 text-blue-600" />
+                  ) : (
+                    <Square className="h-4 w-4 text-gray-400" />
+                  )}
+                </div>
+              </th>
               <th 
-                onClick={() => handleSort('date')}
+                onClick={() => handleSort('examDate')}
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
               >
-                Date {renderSortIcon('date')}
+                Exam Date {renderSortIcon('examDate')}
               </th>
               <th 
                 onClick={() => handleSort('batch')}
@@ -277,6 +463,48 @@ const HourList: React.FC = observer(() => {
               >
                 A+ Count {renderSortIcon('numberOfAPlus')}
               </th>
+              <th 
+                onClick={() => handleSort('year')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+              >
+                Year {renderSortIcon('year')}
+              </th>
+              <th 
+                onClick={() => handleSort('remarks1')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+              >
+                Remarks 1 {renderSortIcon('remarks1')}
+              </th>
+              <th 
+                onClick={() => handleSort('remarks2')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+              >
+                Remarks 2 {renderSortIcon('remarks2')}
+              </th>
+              <th 
+                onClick={() => handleSort('remarks3')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+              >
+                Remarks 3 {renderSortIcon('remarks3')}
+              </th>
+              <th 
+                onClick={() => handleSort('flag1')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+              >
+                Flag 1 {renderSortIcon('flag1')}
+              </th>
+              <th 
+                onClick={() => handleSort('flag2')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+              >
+                Flag 2 {renderSortIcon('flag2')}
+              </th>
+              <th 
+                onClick={() => handleSort('flag3')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+              >
+                Flag 3 {renderSortIcon('flag3')}
+              </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -285,13 +513,26 @@ const HourList: React.FC = observer(() => {
           <tbody className="bg-white divide-y divide-gray-200">
             {hourStore.getHours.length === 0 ? (
               <tr>
-                <td colSpan={14} className="px-6 py-4 text-center text-sm text-gray-500">
+                <td colSpan={23} className="px-6 py-4 text-center text-sm text-gray-500">
                   No hour entries found
                 </td>
               </tr>
             ) : (
               hourStore.getHours.map((hour) => (
-                <tr key={hour._id} className="hover:bg-gray-50">
+                <tr key={hour._id} className={`hover:bg-gray-50 ${selectedHours.includes(hour._id as string) ? 'bg-blue-50' : ''}`}>
+                  {/* Row Checkbox */}
+                  <td className="px-3 py-4 whitespace-nowrap">
+                    <div 
+                      className="flex items-center justify-center cursor-pointer"
+                      onClick={() => handleSelectRow(hour._id as string)}
+                    >
+                      {selectedHours.includes(hour._id as string) ? (
+                        <CheckSquare className="h-4 w-4 text-blue-600" />
+                      ) : (
+                        <Square className="h-4 w-4 text-gray-400" />
+                      )}
+                    </div>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(hour.examDate)}
                   </td>
@@ -302,7 +543,9 @@ const HourList: React.FC = observer(() => {
                     {hour.subject}
                   </td>
                   <td className="sticky left-0 z-10 px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-white">
-                    {highlightSearchMatch(hour.chapter)}
+                    <div className="max-w-[250px] overflow-hidden text-ellipsis">
+                      {highlightSearchMatch(hour.chapter)}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {hour.mode}
@@ -403,6 +646,27 @@ const HourList: React.FC = observer(() => {
                     {hour.numberOfAPlus || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {hour.year || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {hour.remarks1 || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {hour.remarks2 || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {hour.remarks3 || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {hour.flag1 || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {hour.flag2 || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {hour.flag3 || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <button 
                       onClick={() => handleEditClick(hour)}
                       className="text-blue-600 hover:text-blue-900 mr-2"
@@ -432,7 +696,7 @@ const HourList: React.FC = observer(() => {
             onChange={handleChangeRowsPerPage}
             className="border border-gray-300 rounded px-2 py-1 text-sm"
           >
-            {[5, 10, 25, 50].map(size => (
+            {[50, 100, 250, 500].map(size => (
               <option key={size} value={size}>{size}</option>
             ))}
           </select>
@@ -487,6 +751,78 @@ const HourList: React.FC = observer(() => {
         content="Are you sure you want to delete this hour entry? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
+      />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={isBulkDeleteDialogOpen}
+        onClose={() => setIsBulkDeleteDialogOpen(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected Hours"
+        content={`Are you sure you want to delete ${selectedHours.length} selected hour entries? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+
+      {/* CSV Upload Modal */}
+      <ConfirmDialog
+        open={isUploadModalOpen}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setCsvFile(null);
+        }}
+        onConfirm={handleUploadCSV}
+        title="Upload Hours CSV"
+        content={
+          <div className="space-y-4 py-2">
+            <p>Upload a CSV file to import hour data.</p>
+            <div className="border border-dashed border-gray-300 rounded-md p-4">
+              <div className="flex flex-col items-center space-y-2">
+                <FileText className="h-8 w-8 text-gray-400" />
+                <div className="text-sm text-gray-500">
+                  {csvFile ? (
+                    <span className="text-blue-600 font-medium">{csvFile.name}</span>
+                  ) : (
+                    <span>Click to select a CSV file or drag and drop</span>
+                  )}
+                </div>
+                <Button
+                  variant="secondary"
+                  onClick={handleUploadClick}
+                  size="sm"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Browse Files
+                </Button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Import Mode
+              </label>
+              <select
+                value={uploadMode}
+                onChange={(e) => setUploadMode(e.target.value as 'new' | 'update' | 'both')}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              >
+                <option value="both">Add New & Update Existing</option>
+                <option value="new">Add New Only</option>
+                <option value="update">Update Existing Only</option>
+              </select>
+              <p className="mt-1 text-sm text-gray-500">
+                Select how you want to handle the imported data.
+              </p>
+            </div>
+            <div className="border-t border-gray-200 pt-3">
+              <p className="text-sm text-gray-600 mb-1">Need a template?</p>
+              <SampleHourCSV />
+            </div>
+          </div>
+        }
+        confirmText="Upload"
+        cancelText="Cancel"
+        confirmDisabled={!csvFile}
+        fullWidth
       />
 
       {/* Add FileNamePrompt */}

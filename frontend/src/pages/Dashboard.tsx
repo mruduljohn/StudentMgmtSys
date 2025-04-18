@@ -7,6 +7,8 @@ import { useMentorStore } from '../store/mentorStore';
 import { useAuthStore } from '../store/authStore';
 import { Student } from '../types';
 import { Link } from 'react-router-dom';
+import PDFSection from '../components/dashboard/PDFSection';
+import PDFConfigModal from '../components/dashboard/PDFConfigModal';
 
 const DashboardCard: React.FC<{
   title: string;
@@ -33,6 +35,7 @@ const Dashboard: React.FC = observer(() => {
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [isPDFConfigOpen, setIsPDFConfigOpen] = useState(false);
   
   // Initialize stores
   useEffect(() => {
@@ -52,35 +55,38 @@ const Dashboard: React.FC = observer(() => {
   
   const isAdmin = user?.role === 'ADMIN';
   
+  // Get only JOINED students for accurate counting
+  const joinedStudentsOnly = allStudents.filter(s => s.joined === 'JOINED');
+  
   // Count students by status
-  const joinedStudents = allStudents.filter(s => s.joined === 'JOINED').length;
+  const joinedStudents = joinedStudentsOnly.length;
   const allotedStudents = allStudents.filter(s => s.joined === 'ALLOTED').length;
   const discontinuedStudents = allStudents.filter(s => s.joined === 'DISCONTINUED').length;
   const notJoiningStudents = allStudents.filter(s => s.joined === 'NOT JOINING').length;
   const centrechangedStudents = allStudents.filter(s => s.joined === 'CENTRE CHANGE').length;
   
-  // Count students with dues
-  const studyMaterialDue = allStudents.filter(s => 
+  // Count students with dues - only consider JOINED students for dues
+  const studyMaterialDue = joinedStudentsOnly.filter(s => 
     s.studyMaterial === 'NOT RECEIVED' || s.studyMaterial === 'PARTIALLY RECEIVED'
   ).length;
   
-  const uniformDue = allStudents.filter(s => 
+  const uniformDue = joinedStudentsOnly.filter(s => 
     s.uniform === 'NOT RECEIVED' || s.uniform === 'PARTIALLY RECEIVED'
   ).length;
   
-  const idCardDue = allStudents.filter(s => 
+  const idCardDue = joinedStudentsOnly.filter(s => 
     s.idCard === 'NOT RECEIVED'
   ).length;
   
-  const tabDue = allStudents.filter(s => 
+  const tabDue = joinedStudentsOnly.filter(s => 
     s.tab === 'REQUESTED NOT PAID' || s.tab === 'REQUESTED PAID'
   ).length;
   
-  const feeDue = allStudents.filter(s => s.feeDue > 0).length;
+  const feeDue = joinedStudentsOnly.filter(s => s.feeDue > 0).length;
   
-  // Count students by hostel type
-  const dayScholars = allStudents.filter(s => s.hostel === 'DAY SCHOLAR' || s.hostel === 'DS').length;
-  const hostelers = allStudents.length - dayScholars;
+  // Count students by hostel type - only consider JOINED students
+  const dayScholars = joinedStudentsOnly.filter(s => s.hostel === 'DAY SCHOLAR' || s.hostel === 'DS').length;
+  const hostelers = joinedStudentsOnly.length - dayScholars;
   
   // For mentors, also count students in their class
   const mentorClassStudents = !isAdmin && user?.name 
@@ -113,6 +119,9 @@ const Dashboard: React.FC = observer(() => {
         </p>
       </div>
       
+      {/* PDF Section */}
+      <PDFSection onConfigClick={() => setIsPDFConfigOpen(true)} />
+      
       {/* Main statistics cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <DashboardCard
@@ -136,21 +145,12 @@ const Dashboard: React.FC = observer(() => {
           color="bg-yellow-500"
         />
         
-        {isAdmin ? (
-          <DashboardCard
-            title="Total Mentors"
-            value={mentors.length}
-            icon={<UserCog size={24} />}
-            color="bg-purple-500"
-          />
-        ) : (
-          <DashboardCard
-            title="My Students"
-            value={mentorClassStudents.length}
-            icon={<UserCog size={24} />}
-            color="bg-purple-500"
-          />
-        )}
+        <DashboardCard
+          title="My Students"
+          value={isAdmin ? joinedStudents : mentorClassStudents.length}
+          icon={<UserCog size={24} />}
+          color="bg-purple-500"
+        />
       </div>
       
       {/* Additional statistics cards */}
@@ -303,6 +303,12 @@ const Dashboard: React.FC = observer(() => {
           </div>
         )}
       </div>
+      
+      {/* PDF Config Modal */}
+      <PDFConfigModal 
+        isOpen={isPDFConfigOpen}
+        onClose={() => setIsPDFConfigOpen(false)}
+      />
     </Layout>
   );
 });

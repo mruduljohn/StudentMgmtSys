@@ -3,6 +3,9 @@ import { observer } from 'mobx-react-lite';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import Layout from '../components/layout/Layout';
 import { useStudentStore } from '../store/studentStore';
+import { Download, FileSpreadsheet, FileText } from 'lucide-react';
+import Button from '../components/ui/Button';
+import { exportToCSV, exportToPDF, exportToExcel } from '../utils/exportUtils';
 
 interface BatchSummary {
   batch: string;
@@ -54,7 +57,6 @@ const Analytics: React.FC = observer(() => {
     'PETER CLAVER': 38,
     'LITTLE FLOWER': 72,
     'ST.AUGUSTINE': 46,
-    
   };
   
   useEffect(() => {
@@ -125,7 +127,7 @@ const Analytics: React.FC = observer(() => {
         const hostelMap = new Map<string, HostelSummary>();
         const batchesSet = new Set<string>(joinedStudents.map(s => s.batch).filter(Boolean));
         
-        // Initialize hostel summaries
+        // Initialize hostel summaries using all known hostels from capacities
         Object.keys(hostelCapacities).forEach(hostel => {
           const batchCounts: Record<string, number> = {};
           batchesSet.forEach(batch => {
@@ -155,6 +157,28 @@ const Analytics: React.FC = observer(() => {
           batches: dayScholarBatchCounts,
         });
         
+        // Add any additional hostels found in student data that aren't in hostelCapacities
+        joinedStudents.forEach(student => {
+          if (!student.hostel) return;
+          
+          const hostelName = student.hostel === 'DS' ? 'DAY SCHOLAR' : student.hostel;
+          
+          if (!hostelMap.has(hostelName)) {
+            const batchCounts: Record<string, number> = {};
+            batchesSet.forEach(batch => {
+              batchCounts[batch as string] = 0;
+            });
+            
+            hostelMap.set(hostelName, {
+              hostel: hostelName,
+              totalCapacity: 0, // Unknown capacity
+              filled: 0,
+              vacancy: 0,
+              batches: batchCounts,
+            });
+          }
+        });
+        
         // Count students by hostel and batch
         joinedStudents.forEach(student => {
           if (!student.hostel || !student.batch) return;
@@ -162,7 +186,7 @@ const Analytics: React.FC = observer(() => {
           const hostelName = student.hostel === 'DS' ? 'DAY SCHOLAR' : student.hostel;
           
           if (!hostelMap.has(hostelName)) {
-            // Handle hostels not in the predefined list
+            // Handle hostels not in the predefined list (shouldn't happen now with the code above)
             const batchCounts: Record<string, number> = {};
             batchesSet.forEach(batch => {
               batchCounts[batch as string] = 0;
@@ -188,10 +212,10 @@ const Analytics: React.FC = observer(() => {
           }
         });
         
-        // Sort hostel summaries, but put DAY SCHOLAR first
+        // Sort hostel summaries, but put DAY SCHOLAR at the end
         const sortedHostelSummaries = Array.from(hostelMap.values()).sort((a, b) => {
-          if (a.hostel === 'DS') return -1;
-          if (b.hostel === 'DS') return 1;
+          if (a.hostel === 'DAY SCHOLAR') return 1;
+          if (b.hostel === 'DAY SCHOLAR') return -1;
           return a.hostel.localeCompare(b.hostel);
         });
         
@@ -235,8 +259,8 @@ const Analytics: React.FC = observer(() => {
     initializeData();
   }, [studentStore]);
   
-  // Prepare data for charts
-  const batchStrengthData = batchSummaries.slice(0, 10).map(summary => ({
+  // Prepare data for charts - use all batch summaries, not just top 10
+  const batchStrengthData = batchSummaries.map(summary => ({
     name: summary.batch,
     Students: summary.strength,
     'Fee Due': summary.feeDue,
@@ -251,6 +275,166 @@ const Analytics: React.FC = observer(() => {
     { name: 'Day Scholars', value: genderSummary.dayScholars.boys + genderSummary.dayScholars.girls },
     { name: 'Hostelers', value: genderSummary.hostelers.boys + genderSummary.hostelers.girls },
   ];
+
+  // Export functions
+  const exportBatchSummary = () => {
+    // Define custom headers mapping for clearer CSV output
+    const headers = {
+      batch: 'Batch',
+      classTeacher: 'Class Teacher',
+      strength: 'Strength',
+      studyMaterialDue: 'Study Material Due',
+      uniformDue: 'Uniform Due',
+      idCardDue: 'ID Card Due',
+      tabDue: 'Tab Due',
+      feeDue: 'Fee Due (Count)',
+      feeDueAmount: 'Fee Due (Amount)'
+    };
+    
+    exportToCSV(batchSummaries, 'batch-summary', headers);
+  };
+
+  const exportBatchSummaryPDF = () => {
+    // Define custom headers mapping
+    const headers = {
+      batch: 'Batch',
+      classTeacher: 'Class Teacher',
+      strength: 'Strength',
+      studyMaterialDue: 'Study Material Due',
+      uniformDue: 'Uniform Due',
+      idCardDue: 'ID Card Due',
+      tabDue: 'Tab Due',
+      feeDue: 'Fee Due (Count)',
+      feeDueAmount: 'Fee Due (Amount)'
+    };
+    
+    exportToPDF(batchSummaries, 'batch-summary', headers, 'Batch Summary Report');
+  };
+
+  const exportBatchSummaryExcel = () => {
+    // Define custom headers mapping
+    const headers = {
+      batch: 'Batch',
+      classTeacher: 'Class Teacher',
+      strength: 'Strength',
+      studyMaterialDue: 'Study Material Due',
+      uniformDue: 'Uniform Due',
+      idCardDue: 'ID Card Due',
+      tabDue: 'Tab Due',
+      feeDue: 'Fee Due (Count)',
+      feeDueAmount: 'Fee Due (Amount)'
+    };
+    
+    exportToExcel(batchSummaries, 'batch-summary', headers, 'Batch Summary');
+  };
+
+  const exportHostelAllocation = () => {
+    // Create a flattened version of hostel data for export
+    const flattenedHostelData = hostelSummaries.map(summary => {
+      const data: Record<string, unknown> = {
+        hostel: summary.hostel,
+        totalCapacity: summary.totalCapacity,
+        filled: summary.filled,
+        vacancy: summary.vacancy
+      };
+      
+      // Add all batch columns
+      Object.entries(summary.batches).forEach(([batch, count]) => {
+        data[`batch_${batch}`] = count;
+      });
+      
+      return data;
+    });
+    
+    // Create custom headers
+    const headers: Record<string, string> = {
+      hostel: 'Hostel',
+      totalCapacity: 'Total Capacity',
+      filled: 'Filled',
+      vacancy: 'Vacancy'
+    };
+    
+    // Add batch headers
+    if (hostelSummaries.length > 0) {
+      Object.keys(hostelSummaries[0].batches).forEach(batch => {
+        headers[`batch_${batch}`] = batch;
+      });
+    }
+    
+    exportToCSV(flattenedHostelData, 'hostel-allocation', headers);
+  };
+
+  const exportHostelAllocationPDF = () => {
+    // Create a flattened version of hostel data for export
+    const flattenedHostelData = hostelSummaries.map(summary => {
+      const data: Record<string, unknown> = {
+        hostel: summary.hostel,
+        totalCapacity: summary.totalCapacity,
+        filled: summary.filled,
+        vacancy: summary.vacancy
+      };
+      
+      // Add all batch columns
+      Object.entries(summary.batches).forEach(([batch, count]) => {
+        data[`batch_${batch}`] = count;
+      });
+      
+      return data;
+    });
+    
+    // Create custom headers
+    const headers: Record<string, string> = {
+      hostel: 'Hostel',
+      totalCapacity: 'Total Capacity',
+      filled: 'Filled',
+      vacancy: 'Vacancy'
+    };
+    
+    // Add batch headers
+    if (hostelSummaries.length > 0) {
+      Object.keys(hostelSummaries[0].batches).forEach(batch => {
+        headers[`batch_${batch}`] = batch;
+      });
+    }
+    
+    exportToPDF(flattenedHostelData, 'hostel-allocation', headers, 'Hostel Allocation Report');
+  };
+
+  const exportHostelAllocationExcel = () => {
+    // Create a flattened version of hostel data for export
+    const flattenedHostelData = hostelSummaries.map(summary => {
+      const data: Record<string, unknown> = {
+        hostel: summary.hostel,
+        totalCapacity: summary.totalCapacity,
+        filled: summary.filled,
+        vacancy: summary.vacancy
+      };
+      
+      // Add all batch columns
+      Object.entries(summary.batches).forEach(([batch, count]) => {
+        data[`batch_${batch}`] = count;
+      });
+      
+      return data;
+    });
+    
+    // Create custom headers
+    const headers: Record<string, string> = {
+      hostel: 'Hostel',
+      totalCapacity: 'Total Capacity',
+      filled: 'Filled',
+      vacancy: 'Vacancy'
+    };
+    
+    // Add batch headers
+    if (hostelSummaries.length > 0) {
+      Object.keys(hostelSummaries[0].batches).forEach(batch => {
+        headers[`batch_${batch}`] = batch;
+      });
+    }
+    
+    exportToExcel(flattenedHostelData, 'hostel-allocation', headers, 'Hostel Allocation');
+  };
   
   if (loading) {
     return (
@@ -322,9 +506,9 @@ const Analytics: React.FC = observer(() => {
         </div>
       </div>
       
-      {/* Batch Strength Chart */}
+      {/* Batch Strength Chart - showing all batches, not just top 10 */}
       <div className="bg-white p-4 rounded-lg shadow mb-8">
-        <h2 className="text-lg font-semibold mb-4">Batch Strength Comparison (Top 10 Batches)</h2>
+        <h2 className="text-lg font-semibold mb-4">Batch Strength Comparison</h2>
         <ResponsiveContainer width="100%" height={400}>
           <BarChart
             data={batchStrengthData}
@@ -336,14 +520,45 @@ const Analytics: React.FC = observer(() => {
             <Tooltip />
             <Legend />
             <Bar dataKey="Students" name="Student Count" fill="#8884d8" />
-            <Bar dataKey="Fee Due" name="Fee Due" fill="#82ca9d" />
+            <Bar dataKey="Fee Due" name="Fee Due" fill="#ff0000" /> {/* Changed to red color */}
           </BarChart>
         </ResponsiveContainer>
       </div>
       
       {/* Batch Summary Table */}
       <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Batch Summary</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Batch Summary</h2>
+          <div className="flex gap-2">
+            <Button 
+              variant="secondary"
+              size="sm"
+              onClick={exportBatchSummary}
+              className="flex items-center"
+            >
+              <Download size={16} className="mr-2" />
+              CSV
+            </Button>
+            <Button 
+              variant="secondary"
+              size="sm"
+              onClick={exportBatchSummaryExcel}
+              className="flex items-center"
+            >
+              <FileSpreadsheet size={16} className="mr-2" />
+              Excel
+            </Button>
+            <Button 
+              variant="secondary"
+              size="sm"
+              onClick={exportBatchSummaryPDF}
+              className="flex items-center"
+            >
+              <FileText size={16} className="mr-2" />
+              PDF
+            </Button>
+          </div>
+        </div>
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="max-h-[70vh] overflow-y-auto relative">
             <div className="overflow-x-auto">
@@ -450,7 +665,38 @@ const Analytics: React.FC = observer(() => {
       
       {/* Hostel Summary Table */}
       <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Hostel Allocation</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Hostel Allocation</h2>
+          <div className="flex gap-2">
+            <Button 
+              variant="secondary"
+              size="sm"
+              onClick={exportHostelAllocation}
+              className="flex items-center"
+            >
+              <Download size={16} className="mr-2" />
+              CSV
+            </Button>
+            <Button 
+              variant="secondary"
+              size="sm"
+              onClick={exportHostelAllocationExcel}
+              className="flex items-center"
+            >
+              <FileSpreadsheet size={16} className="mr-2" />
+              Excel
+            </Button>
+            <Button 
+              variant="secondary"
+              size="sm"
+              onClick={exportHostelAllocationPDF}
+              className="flex items-center"
+            >
+              <FileText size={16} className="mr-2" />
+              PDF
+            </Button>
+          </div>
+        </div>
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="max-h-[70vh] overflow-y-auto relative">
             <div className="overflow-x-auto">

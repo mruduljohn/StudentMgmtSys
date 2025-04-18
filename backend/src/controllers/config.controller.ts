@@ -227,6 +227,9 @@ export const updateSubjectChapters = async (req: Request, res: Response): Promis
     }
     
     // Update the chapters for the specified subject
+    if (!config.subjectChapters) {
+      config.subjectChapters = new Map();
+    }
     config.subjectChapters.set(subject, chapters);
     
     // Save the updated config
@@ -395,6 +398,9 @@ export const initializeDefaultSubjectChapters = async (req: Request, res: Respon
     }
     
     // Update with default chapters
+    if (!config.subjectChapters) {
+      config.subjectChapters = new Map();
+    }
     for (const [subject, chapters] of Object.entries(defaultChapters)) {
       config.subjectChapters.set(subject, chapters);
     }

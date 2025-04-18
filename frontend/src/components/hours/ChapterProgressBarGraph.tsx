@@ -147,9 +147,9 @@ const ChapterProgressBarGraph: React.FC<ChapterProgressBarGraphProps> = observer
       case 'COMPLETED':
         return '#4CAF50'; // Green
       case 'ONGOING':
-        return '#FFC107'; // Yellow
+        return '#FF9800'; // Orange (changed from yellow)
       case 'NOT STARTED':
-        return '#FF5722'; // Orange/Red
+        return '#9E9E9E'; // Grey
       default:
         return '#9E9E9E'; // Grey
     }
@@ -238,8 +238,8 @@ const ChapterProgressBarGraph: React.FC<ChapterProgressBarGraphProps> = observer
                 wrapperStyle={{ paddingBottom: 10 }}
                 payload={[
                   { value: 'Completed', type: 'square', color: '#4CAF50' },
-                  { value: 'Ongoing', type: 'square', color: '#FFC107' },
-                  { value: 'Not Started', type: 'square', color: '#FF5722' },
+                  { value: 'Ongoing', type: 'square', color: '#FF9800' },
+                  { value: 'Not Started', type: 'square', color: '#9E9E9E' },
                   { value: 'Total Allotted', type: 'square', color: '#e0e0e0' }
                 ]}
               />

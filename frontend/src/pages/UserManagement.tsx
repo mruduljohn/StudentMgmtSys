@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Trash2, UserPlus, Edit, Key } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/ui/Button';
@@ -49,10 +49,26 @@ const UserManagement: React.FC = () => {
   const [adminDeleteConfirmation, setAdminDeleteConfirmation] = useState('');
   const [adminDeleteConfirmText, setAdminDeleteConfirmText] = useState('');
 
+  // Use useCallback for modal handlers
+  const closeAddModal = useCallback(() => setIsAddModalOpen(false), []);
+  const closeEditModal = useCallback(() => setIsEditModalOpen(false), []);
+  const closeDeleteModal = useCallback(() => {
+    setIsDeleteModalOpen(false);
+    setAdminDeleteConfirmation('');
+  }, []);
+  const closeResetPasswordModal = useCallback(() => setIsResetPasswordModalOpen(false), []);
+
   // Fetch all users on component mount
   useEffect(() => {
     fetchUsers();
   }, []);
+  
+  // Set admin delete confirmation text when selectedUser changes
+  useEffect(() => {
+    if (selectedUser?.role === 'ADMIN') {
+      setAdminDeleteConfirmText(`DELETE-${selectedUser.username}`);
+    }
+  }, [selectedUser]);
 
   const fetchUsers = async () => {
     try {
@@ -337,7 +353,7 @@ const UserManagement: React.FC = () => {
       {/* Add User Modal */}
       <Modal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={closeAddModal}
         title="Add New User"
       >
         <form onSubmit={handleAddUser} className="space-y-4">
@@ -408,7 +424,7 @@ const UserManagement: React.FC = () => {
           <div className="flex justify-end space-x-3 pt-4">
             <Button
               variant="secondary"
-              onClick={() => setIsAddModalOpen(false)}
+              onClick={closeAddModal}
             >
               Cancel
             </Button>
@@ -425,7 +441,7 @@ const UserManagement: React.FC = () => {
       {/* Edit User Modal */}
       <Modal
         isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        onClose={closeEditModal}
         title="Edit User"
       >
         <form onSubmit={handleEditUser} className="space-y-4">
@@ -477,7 +493,7 @@ const UserManagement: React.FC = () => {
           <div className="flex justify-end space-x-3 pt-4">
             <Button
               variant="secondary"
-              onClick={() => setIsEditModalOpen(false)}
+              onClick={closeEditModal}
             >
               Cancel
             </Button>
@@ -494,7 +510,7 @@ const UserManagement: React.FC = () => {
       {/* Delete User Confirmation Modal */}
       <Modal
         isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
+        onClose={closeDeleteModal}
         title="Delete User"
       >
         <div className="p-4">
@@ -509,13 +525,6 @@ const UserManagement: React.FC = () => {
                 <p className="font-medium">Warning: You are about to delete an ADMIN account!</p>
                 <p className="text-sm">Deleting an admin account can have serious consequences for system access and management.</p>
               </div>
-              
-              {/* Set the confirmation text when the component renders */}
-              {React.useEffect(() => {
-                if (selectedUser?.role === 'ADMIN') {
-                  setAdminDeleteConfirmText(`DELETE-${selectedUser.username}`);
-                }
-              }, [selectedUser])}
               
               <div className="my-4">
                 <p className="text-sm text-gray-700 mb-2">
@@ -536,10 +545,7 @@ const UserManagement: React.FC = () => {
           <div className="flex justify-end space-x-3">
             <Button
               variant="secondary"
-              onClick={() => {
-                setIsDeleteModalOpen(false);
-                setAdminDeleteConfirmation('');
-              }}
+              onClick={closeDeleteModal}
             >
               Cancel
             </Button>
@@ -557,17 +563,22 @@ const UserManagement: React.FC = () => {
       {/* Reset Password Modal */}
       <Modal
         isOpen={isResetPasswordModalOpen}
-        onClose={() => setIsResetPasswordModalOpen(false)}
+        onClose={closeResetPasswordModal}
         title="Reset Password"
       >
-        {selectedUser && (
-          <PasswordResetForm
-            user={selectedUser}
-            onClose={() => setIsResetPasswordModalOpen(false)}
-            isSelf={selectedUser.id === currentUser?.id}
-            currentUserRole={currentUser?.role}
-          />
-        )}
+        <PasswordResetForm
+          user={selectedUser || { 
+            id: '', 
+            username: '', 
+            name: '', 
+            email: '', 
+            role: 'ADMIN',
+            class: ''
+          }}
+          onClose={closeResetPasswordModal}
+          isSelf={selectedUser?.id === currentUser?.id}
+          currentUserRole={currentUser?.role}
+        />
       </Modal>
     </Layout>
   );
