@@ -2,12 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { Edit, Trash2, Plus, ArrowUp, ArrowDown, Download, AlertTriangle, Upload, FileText, CheckSquare, Square } from 'lucide-react';
 import { useHourStore } from '../../store/hourStore';
+import { useAuthStore } from '../../store/authStore';
 import { Hour } from '../../types';
 import HourModal from './HourModal';
 import ConfirmDialog from '../common/ConfirmDialog';
 import { formatDate } from '../../utils/formatters';
 import Button from '../../components/ui/Button';
-import { hoursToExcel, downloadExcel, hoursToCSV, downloadCSV, hoursToPDF, downloadPDF } from '../../utils/excelUtils';
+import {
+  hoursToExcel, downloadExcel, hoursToCSV, downloadCSV, hoursToPDF, downloadPDF,
+  hoursToTransposedExcel, hoursToTransposedCSV, hoursToTransposedPDF
+} from '../../utils/excelUtils';
 import FileNamePrompt from '../ui/FileNamePrompt';
 import toast from 'react-hot-toast';
 import Menu from '../ui/Menu';
@@ -15,6 +19,8 @@ import SampleHourCSV from './SampleHourCSV';
 
 const HourList: React.FC = observer(() => {
   const hourStore = useHourStore();
+  const authStore = useAuthStore();
+  const isAdmin = authStore.user?.role === 'ADMIN';
   const [openAddModal, setOpenAddModal] = useState(false);
   const [openEditModal, setOpenEditModal] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
@@ -218,15 +224,15 @@ const HourList: React.FC = observer(() => {
       
       switch (exportFormat) {
         case 'xlsx':
-          const excelData = hoursToExcel(hours);
+          const excelData = hoursToTransposedExcel(hours);
           downloadExcel(excelData, `${filename}.xlsx`);
           break;
         case 'csv':
-          const csvData = hoursToCSV(hours);
+          const csvData = hoursToTransposedCSV(hours);
           downloadCSV(csvData, `${filename}.csv`);
           break;
         case 'pdf':
-          const pdfDoc = hoursToPDF(hours);
+          const pdfDoc = hoursToTransposedPDF(hours);
           downloadPDF(pdfDoc, `${filename}.pdf`);
           break;
       }
@@ -269,6 +275,50 @@ const HourList: React.FC = observer(() => {
     }
   };
 
+  // Add invert selection function
+  const handleInvertSelection = () => {
+    const allHourIds = hourStore.getHours.map(hour => hour._id as string);
+    const invertedSelection = allHourIds.filter(id => !selectedHours.includes(id));
+    setSelectedHours(invertedSelection);
+  };
+
+  // Handle export of unselected hours
+  const handleExportUnselected = () => {
+    try {
+      // Get the hours that are not in the selected list
+      const unselectedHours = hourStore.getHours.filter(h => !selectedHours.includes(h._id as string));
+
+      if (unselectedHours.length === 0) {
+        toast.error('No unselected hours to export');
+        return;
+      }
+      
+      // Set the file name with a timestamp
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const fileName = `hours-unselected-${timestamp}`;
+      
+      switch (exportFormat) {
+        case 'xlsx':
+          const excelData = hoursToTransposedExcel(unselectedHours);
+          downloadExcel(excelData, `${fileName}.xlsx`);
+          break;
+        case 'csv':
+          const csvData = hoursToTransposedCSV(unselectedHours);
+          downloadCSV(csvData, `${fileName}.csv`);
+          break;
+        case 'pdf':
+          const pdfDoc = hoursToTransposedPDF(unselectedHours);
+          downloadPDF(pdfDoc, `${fileName}.pdf`);
+          break;
+      }
+      
+      toast.success(`Successfully exported ${unselectedHours.length} unselected hour records`);
+    } catch (err) {
+      console.error('Error exporting unselected data:', err);
+      toast.error('Failed to export unselected data');
+    }
+  };
+
   if (hourStore.isLoading && !hourStore.getHours.length) {
     return (
       <div className="flex justify-center p-8">
@@ -282,23 +332,25 @@ const HourList: React.FC = observer(() => {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold">Hour Entries</h2>
         <div className="flex space-x-2">
-          {/* Upload CSV Button */}
-          <div className="relative">
-            <Button
-              variant="secondary"
-              onClick={() => setIsUploadModalOpen(true)}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Import CSV
-            </Button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".csv"
-              className="hidden"
-            />
-          </div>
+          {/* Upload CSV Button - Admin Only */}
+          {isAdmin && (
+            <div className="relative">
+              <Button
+                variant="secondary"
+                onClick={() => setIsUploadModalOpen(true)}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import CSV
+              </Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".csv"
+                className="hidden"
+              />
+            </div>
+          )}
 
           {/* Bulk Operations Menu */}
           {selectedHours.length > 0 && (
@@ -315,17 +367,47 @@ const HourList: React.FC = observer(() => {
                 <Menu
                   items={[
                     { 
-                      label: 'Export Selected to Excel', 
-                      onClick: () => handleExportSelected('xlsx') 
+                      label: 'Invert Selection', 
+                      onClick: handleInvertSelection 
                     },
-                    { 
-                      label: 'Export Selected to CSV', 
-                      onClick: () => handleExportSelected('csv') 
-                    },
-                    { 
-                      label: 'Export Selected to PDF', 
-                      onClick: () => handleExportSelected('pdf') 
-                    },
+                    ...(isAdmin ? [
+                      { 
+                        label: 'Export Selected to Excel', 
+                        onClick: () => handleExportSelected('xlsx') 
+                      },
+                      { 
+                        label: 'Export Selected to CSV', 
+                        onClick: () => handleExportSelected('csv') 
+                      },
+                      { 
+                        label: 'Export Selected to PDF', 
+                        onClick: () => handleExportSelected('pdf') 
+                      },
+                      { 
+                        label: 'Export Unselected to Excel',
+                        onClick: () => {
+                          setExportFormat('xlsx');
+                          handleExportUnselected();
+                        },
+                        disabled: selectedHours.length === hourStore.getHours.length
+                      },
+                      { 
+                        label: 'Export Unselected to CSV',
+                        onClick: () => {
+                          setExportFormat('csv');
+                          handleExportUnselected();
+                        },
+                        disabled: selectedHours.length === hourStore.getHours.length
+                      },
+                      { 
+                        label: 'Export Unselected to PDF',
+                        onClick: () => {
+                          setExportFormat('pdf');
+                          handleExportUnselected();
+                        },
+                        disabled: selectedHours.length === hourStore.getHours.length
+                      },
+                    ] : []),
                     { 
                       label: 'Delete Selected', 
                       onClick: () => setIsBulkDeleteDialogOpen(true),
@@ -339,28 +421,30 @@ const HourList: React.FC = observer(() => {
             </div>
           )}
 
-          {/* Export Menu */}
-          <div className="relative">
-            <Button
-              variant="secondary"
-              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            
-            {isExportMenuOpen && (
-              <Menu
-                items={[
-                  { label: 'Excel (.xlsx)', onClick: () => handleExportFormat('xlsx') },
-                  { label: 'CSV (.csv)', onClick: () => handleExportFormat('csv') },
-                  { label: 'PDF (.pdf)', onClick: () => handleExportFormat('pdf') }
-                ]}
-                onClose={() => setIsExportMenuOpen(false)}
-                className="right-0 mt-2"
-              />
-            )}
-          </div>
+          {/* Export Menu - Admin Only */}
+          {isAdmin && (
+            <div className="relative">
+              <Button
+                variant="secondary"
+                onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              
+              {isExportMenuOpen && (
+                <Menu
+                  items={[
+                    { label: 'Excel (.xlsx)', onClick: () => handleExportFormat('xlsx') },
+                    { label: 'CSV (.csv)', onClick: () => handleExportFormat('csv') },
+                    { label: 'PDF (.pdf)', onClick: () => handleExportFormat('pdf') }
+                  ]}
+                  onClose={() => setIsExportMenuOpen(false)}
+                  className="right-0 mt-2"
+                />
+              )}
+            </div>
+          )}
           
           <Button
             variant="primary"

@@ -665,6 +665,20 @@ const Students: React.FC = observer(() => {
           Deselect All
         </Button>
 
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            // Invert the current selection
+            const allStudentIds = studentStore.getStudents.map(s => s.studentId);
+            const invertedSelection = allStudentIds.filter(id => !selectedRows.includes(id));
+            setSelectedRows(invertedSelection);
+          }}
+          title="Invert the current selection"
+        >
+          Invert Selection
+        </Button>
+
         {/* Export format selector */}
         <select
           className="p-1 border rounded text-sm"
@@ -698,6 +712,62 @@ const Students: React.FC = observer(() => {
             >
               <FileDown size={16} className="mr-1" />
               Export Selected ({selectedRows.length})
+            </Button>
+            
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                // Get all student IDs from the current filtered view
+                const allStudentIds = studentStore.getStudents.map(s => s.studentId);
+                // Export students that are not in the current selection
+                const unselectedStudents = studentStore.getStudents.filter(
+                  student => !selectedRows.includes(student.studentId)
+                );
+                // Prepare export with unselected students
+                const timestamp = new Date().toISOString().slice(0, 10);
+                const defaultName = `students-unselected-${timestamp}`;
+                
+                // Get custom labels from the store for remarks and flags
+                const customLabels = {
+                  remarks: studentStore.remarksConfig.remarks,
+                  remarks1: studentStore.remarksConfig.remarks1,
+                  remarks2: studentStore.remarksConfig.remarks2,
+                  remarks3: studentStore.remarksConfig.remarks3,
+                  remarks4: studentStore.remarksConfig.remarks4,
+                  flag1: studentStore.flagsConfig.flag1,
+                  flag2: studentStore.flagsConfig.flag2,
+                  flag3: studentStore.flagsConfig.flag3,
+                  flag4: studentStore.flagsConfig.flag4
+                };
+                
+                try {
+                  if (exportFormat === 'xlsx') {
+                    const excelData = studentsToExcel(unselectedStudents, customLabels);
+                    setExportData(excelData);
+                    setExportDefaultFilename(defaultName);
+                    setIsFileNamePromptOpen(true);
+                  } else if (exportFormat === 'csv') {
+                    const csvData = studentsToCSV(unselectedStudents, customLabels);
+                    setExportData(csvData);
+                    setExportDefaultFilename(defaultName);
+                    setIsFileNamePromptOpen(true);
+                  } else if (exportFormat === 'pdf') {
+                    const pdfDoc = studentsToPDF(unselectedStudents, customLabels);
+                    setExportData(pdfDoc);
+                    setExportDefaultFilename(defaultName);
+                    setIsFileNamePromptOpen(true);
+                  }
+                } catch (err) {
+                  console.error('Error exporting unselected student data:', err);
+                  showErrorMessage('Failed to export unselected students data');
+                }
+              }}
+              title="Export unselected students"
+              disabled={allSelected || !hasSelected}
+            >
+              <FileDown size={16} className="mr-1" />
+              Export Unselected ({studentStore.getStudents.length - selectedRows.length})
             </Button>
             
           <Button

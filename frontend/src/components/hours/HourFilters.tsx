@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Loader, Check, X, AlertTriangle } from 'lucide-react';
 
 interface HourFiltersProps {
   batches: string[];
@@ -18,6 +18,8 @@ interface HourFiltersProps {
   onTeacherChange: (teacher: string) => void;
   onStatusChange: (status: string) => void;
   onChapterSearch?: (query: string) => void;
+  loading?: boolean;
+  totalResults?: number;
 }
 
 const HourFilters: React.FC<HourFiltersProps> = ({
@@ -36,8 +38,32 @@ const HourFilters: React.FC<HourFiltersProps> = ({
   onModeChange,
   onTeacherChange,
   onStatusChange,
-  onChapterSearch = () => {}
+  onChapterSearch = () => {},
+  loading = false,
+  totalResults = 0
 }) => {
+  const [internalSearchQuery, setInternalSearchQuery] = useState(chapterSearchQuery);
+  const [searchStatus, setSearchStatus] = useState<'idle' | 'searching' | 'completed' | 'no-results'>('idle');
+  const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Update internal search state when prop changes
+  useEffect(() => {
+    setInternalSearchQuery(chapterSearchQuery);
+  }, [chapterSearchQuery]);
+
+  // Update search status based on loading state and results
+  useEffect(() => {
+    if (loading) {
+      setSearchStatus('searching');
+    } else if (internalSearchQuery && totalResults === 0) {
+      setSearchStatus('no-results');
+    } else if (internalSearchQuery) {
+      setSearchStatus('completed');
+    } else {
+      setSearchStatus('idle');
+    }
+  }, [loading, internalSearchQuery, totalResults]);
+
   const handleBatchChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     onBatchChange(event.target.value);
   };
@@ -59,7 +85,61 @@ const HourFilters: React.FC<HourFiltersProps> = ({
   };
   
   const handleChapterSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    onChapterSearch(event.target.value);
+    const value = event.target.value;
+    setInternalSearchQuery(value);
+    
+    // Clear any existing timeout
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+    }
+    
+    // Set searching status immediately for better UX
+    if (value.trim()) {
+      setSearchStatus('searching');
+    } else {
+      setSearchStatus('idle');
+    }
+    
+    // Debounce the actual search to avoid too many API calls
+    const timeout = setTimeout(() => {
+      onChapterSearch(value);
+    }, 300); // 300ms debounce
+    
+    setDebounceTimeout(timeout);
+  };
+
+  const clearSearch = () => {
+    setInternalSearchQuery('');
+    onChapterSearch('');
+    setSearchStatus('idle');
+  };
+
+  // Render search status indicator
+  const renderSearchStatus = () => {
+    switch (searchStatus) {
+      case 'searching':
+        return (
+          <div className="absolute inset-y-0 right-10 flex items-center pr-2">
+            <Loader className="h-4 w-4 text-blue-500 animate-spin" />
+          </div>
+        );
+      case 'completed':
+        return (
+          <div className="absolute inset-y-0 right-10 flex items-center pr-2">
+            <Check className="h-4 w-4 text-green-500" />
+            <span className="text-xs text-green-500 ml-1">{totalResults} found</span>
+          </div>
+        );
+      case 'no-results':
+        return (
+          <div className="absolute inset-y-0 right-10 flex items-center pr-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <span className="text-xs text-amber-500 ml-1">No results</span>
+          </div>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -115,10 +195,19 @@ const HourFilters: React.FC<HourFiltersProps> = ({
               id="chapter-search"
               type="text"
               placeholder="Search chapters..."
-              value={chapterSearchQuery}
+              value={internalSearchQuery}
               onChange={handleChapterSearch}
               className="pl-10 px-3 py-2 bg-white border shadow-sm border-gray-300 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-blue-500 block w-full rounded-md sm:text-sm focus:ring-1"
             />
+            {renderSearchStatus()}
+            {internalSearchQuery && (
+              <div 
+                className="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer"
+                onClick={clearSearch}
+              >
+                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+              </div>
+            )}
           </div>
         </div>
         

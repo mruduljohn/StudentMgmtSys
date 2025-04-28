@@ -231,8 +231,13 @@ export const getAllConfigs = async () => {
       batches: configs.find((c: ConfigItem) => c.category === 'batches')?.values || [],
       teachers: configs.find((c: ConfigItem) => c.category === 'classTeachers')?.values || [],
       hostels: configs.find((c: ConfigItem) => c.category === 'hostels')?.values || [],
+      hostelCapacity: parseHostelCapacity(configs.find((c: ConfigItem) => c.category === 'hostelCapacity')?.values?.[0]),
       programs: configs.find((c: ConfigItem) => c.category === 'programs')?.values || [],
-      streams: configs.find((c: ConfigItem) => c.category === 'streams')?.values || []
+      streams: configs.find((c: ConfigItem) => c.category === 'streams')?.values || [],
+      studyMaterials: configs.find((c: ConfigItem) => c.category === 'studyMaterials')?.values || ['NOT RECEIVED', 'RECEIVED', 'PARTIALLY RECEIVED'],
+      uniforms: configs.find((c: ConfigItem) => c.category === 'uniforms')?.values || ['NOT RECEIVED', 'RECEIVED', 'PARTIALLY RECEIVED'],
+      idCards: configs.find((c: ConfigItem) => c.category === 'idCards')?.values || ['NOT RECEIVED', 'RECEIVED'],
+      tabs: configs.find((c: ConfigItem) => c.category === 'tabs')?.values || ['REQUESTED NOT PAID', 'RECEIVED PAID', 'RECEIVED NOT PAID', 'REQUESTED PAID', 'PERSONAL TAB', 'NOT REQUIRED']
     };
     
     const remarksConfig = {
@@ -250,10 +255,19 @@ export const getAllConfigs = async () => {
       flag4: configs.find((c: ConfigItem) => c.category === 'flag4')?.values[0] || 'Flag 4'
     };
     
+    // Get predefined flag options if available
+    const predefinedFlagOptions = {
+      flag1: configs.find((c: ConfigItem) => c.category === 'predefined_flag1')?.values || ['PENDING', 'COMPLETED', 'URGENT', 'REVIEW'],
+      flag2: configs.find((c: ConfigItem) => c.category === 'predefined_flag2')?.values || ['HIGH', 'MEDIUM', 'LOW', 'CRITICAL'],
+      flag3: configs.find((c: ConfigItem) => c.category === 'predefined_flag3')?.values || ['ACADEMIC', 'BEHAVIORAL', 'ATTENDANCE', 'HEALTH'],
+      flag4: configs.find((c: ConfigItem) => c.category === 'predefined_flag4')?.values || ['ACTIVE', 'INACTIVE', 'SUSPENDED', 'PROBATION']
+    };
+    
     return {
       batchConfig,
       remarksConfig,
       flagsConfig,
+      predefinedFlagOptions,
       rawConfigs: configs
     };
   } catch (error) {
@@ -600,3 +614,14 @@ export const deleteDashboardPDF = async (filePath: string) => {
     throw error;
   }
 };
+
+// Helper function to parse hostel capacity JSON
+function parseHostelCapacity(jsonStr?: string): Record<string, number> {
+  if (!jsonStr) return {};
+  try {
+    return JSON.parse(jsonStr);
+  } catch (error) {
+    console.error('Error parsing hostel capacity:', error);
+    return {};
+  }
+}

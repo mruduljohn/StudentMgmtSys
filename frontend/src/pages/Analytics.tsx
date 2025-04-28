@@ -6,6 +6,7 @@ import { useStudentStore } from '../store/studentStore';
 import { Download, FileSpreadsheet, FileText } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { exportToCSV, exportToPDF, exportToExcel } from '../utils/exportUtils';
+import { toast, Toaster } from 'react-hot-toast';
 
 interface BatchSummary {
   batch: string;
@@ -43,221 +44,209 @@ const Analytics: React.FC = observer(() => {
     dayScholars: { boys: 0, girls: 0 },
   });
   
-  // Define hostel capacities (this would ideally come from an API or configuration)
-  const hostelCapacities: Record<string, number> = {
-    'ST.ANNS': 65,
-    'MARIGOLD GRAND': 70,
-    'ST.JOHNS': 42,
-    'THE GUARDIAN': 73,
-    'NEST GRAND': 121,
-    'LAVERNA': 48,
-    'B MADONA': 53,
-    'B MARTHOMA': 59,
-    'B ST.MARYS': 77,
-    'PETER CLAVER': 38,
-    'LITTLE FLOWER': 72,
-    'ST.AUGUSTINE': 46,
-  };
+  // Use hostel capacities from store instead of hardcoded values
+  const hostelCapacities = studentStore.batchConfig.hostelCapacity;
   
   useEffect(() => {
-    const initializeData = async () => {
-      try {
-        if (!studentStore.isDataLoaded) {
-          await studentStore.init();
+    initializeData();
+  }, [studentStore, hostelCapacities]);
+  
+  // Extracted initializeData function so it can be reused
+  const initializeData = async () => {
+    try {
+      if (!studentStore.isDataLoaded) {
+        await studentStore.init();
+      }
+      
+      const allStudents = studentStore.getAllStudents;
+      
+      // Filter to only include students who are JOINED
+      const joinedStudents = allStudents.filter(student => student.joined === 'JOINED');
+      
+      // Process batch summaries
+      const batchMap = new Map<string, BatchSummary>();
+      
+      joinedStudents.forEach(student => {
+        if (!student.batch) return;
+        
+        if (!batchMap.has(student.batch)) {
+          batchMap.set(student.batch, {
+            batch: student.batch,
+            classTeacher: student.classTeacher || 'Not Assigned',
+            strength: 0,
+            studyMaterialDue: 0,
+            uniformDue: 0,
+            idCardDue: 0,
+            tabDue: 0,
+            feeDue: 0,
+            feeDueAmount: 0,
+          });
         }
         
-        const allStudents = studentStore.getAllStudents;
+        const summary = batchMap.get(student.batch)!;
+        summary.strength++;
         
-        // Filter to only include students who are JOINED
-        const joinedStudents = allStudents.filter(student => student.joined === 'JOINED');
+        if (student.studyMaterial === 'NOT RECEIVED' || student.studyMaterial === 'PARTIALLY RECEIVED') {
+          summary.studyMaterialDue++;
+        }
         
-        // Process batch summaries
-        const batchMap = new Map<string, BatchSummary>();
+        if (student.uniform === 'NOT RECEIVED' || student.uniform === 'PARTIALLY RECEIVED') {
+          summary.uniformDue++;
+        }
         
-        joinedStudents.forEach(student => {
-          if (!student.batch) return;
-          
-          if (!batchMap.has(student.batch)) {
-            batchMap.set(student.batch, {
-              batch: student.batch,
-              classTeacher: student.classTeacher || 'Not Assigned',
-              strength: 0,
-              studyMaterialDue: 0,
-              uniformDue: 0,
-              idCardDue: 0,
-              tabDue: 0,
-              feeDue: 0,
-              feeDueAmount: 0,
-            });
-          }
-          
-          const summary = batchMap.get(student.batch)!;
-          summary.strength++;
-          
-          if (student.studyMaterial === 'NOT RECEIVED' || student.studyMaterial === 'PARTIALLY RECEIVED') {
-            summary.studyMaterialDue++;
-          }
-          
-          if (student.uniform === 'NOT RECEIVED' || student.uniform === 'PARTIALLY RECEIVED') {
-            summary.uniformDue++;
-          }
-          
-          if (student.idCard === 'NOT RECEIVED') {
-            summary.idCardDue++;
-          }
-          
-          if (student.tab === 'REQUESTED NOT PAID' || student.tab === 'REQUESTED PAID') {
-            summary.tabDue++;
-          }
-          
-          if (student.feeDue > 0) {
-            summary.feeDue++;
-            summary.feeDueAmount += student.feeDue;
-          }
+        if (student.idCard === 'NOT RECEIVED') {
+          summary.idCardDue++;
+        }
+        
+        if (student.tab === 'REQUESTED NOT PAID' || student.tab === 'REQUESTED PAID') {
+          summary.tabDue++;
+        }
+        
+        if (student.feeDue > 0) {
+          summary.feeDue++;
+          summary.feeDueAmount += student.feeDue;
+        }
+      });
+      
+      // Sort batch summaries by batch name
+      const sortedBatchSummaries = Array.from(batchMap.values()).sort((a, b) => 
+        a.batch.localeCompare(b.batch)
+      );
+      
+      setBatchSummaries(sortedBatchSummaries);
+      
+      // Process hostel summaries
+      const hostelMap = new Map<string, HostelSummary>();
+      const batchesSet = new Set<string>(joinedStudents.map(s => s.batch).filter(Boolean));
+      
+      // Initialize hostel summaries using all known hostels from capacities
+      Object.keys(hostelCapacities).forEach(hostel => {
+        const batchCounts: Record<string, number> = {};
+        batchesSet.forEach(batch => {
+          batchCounts[batch as string] = 0;
         });
         
-        // Sort batch summaries by batch name
-        const sortedBatchSummaries = Array.from(batchMap.values()).sort((a, b) => 
-          a.batch.localeCompare(b.batch)
-        );
+        hostelMap.set(hostel, {
+          hostel,
+          totalCapacity: hostelCapacities[hostel] || 0,
+          filled: 0,
+          vacancy: hostelCapacities[hostel] || 0,
+          batches: batchCounts,
+        });
+      });
+      
+      // Add day scholar option
+      const dayScholarBatchCounts: Record<string, number> = {};
+      batchesSet.forEach(batch => {
+        dayScholarBatchCounts[batch as string] = 0;
+      });
+      
+      hostelMap.set('DAY SCHOLAR', {
+        hostel: 'DAY SCHOLAR',
+        totalCapacity: 0, // No capacity limit for day scholars
+        filled: 0,
+        vacancy: 0,
+        batches: dayScholarBatchCounts,
+      });
+      
+      // Add any additional hostels found in student data that aren't in hostelCapacities
+      joinedStudents.forEach(student => {
+        if (!student.hostel) return;
         
-        setBatchSummaries(sortedBatchSummaries);
+        const hostelName = student.hostel === 'DS' ? 'DAY SCHOLAR' : student.hostel;
         
-        // Process hostel summaries
-        const hostelMap = new Map<string, HostelSummary>();
-        const batchesSet = new Set<string>(joinedStudents.map(s => s.batch).filter(Boolean));
-        
-        // Initialize hostel summaries using all known hostels from capacities
-        Object.keys(hostelCapacities).forEach(hostel => {
+        if (!hostelMap.has(hostelName)) {
           const batchCounts: Record<string, number> = {};
           batchesSet.forEach(batch => {
             batchCounts[batch as string] = 0;
           });
           
-          hostelMap.set(hostel, {
-            hostel,
-            totalCapacity: hostelCapacities[hostel] || 0,
+          hostelMap.set(hostelName, {
+            hostel: hostelName,
+            totalCapacity: 0, // Unknown capacity
             filled: 0,
-            vacancy: hostelCapacities[hostel] || 0,
+            vacancy: 0,
             batches: batchCounts,
           });
-        });
+        }
+      });
+      
+      // Count students by hostel and batch
+      joinedStudents.forEach(student => {
+        if (!student.hostel || !student.batch) return;
         
-        // Add day scholar option
-        const dayScholarBatchCounts: Record<string, number> = {};
-        batchesSet.forEach(batch => {
-          dayScholarBatchCounts[batch as string] = 0;
-        });
+        const hostelName = student.hostel === 'DS' ? 'DAY SCHOLAR' : student.hostel;
         
-        hostelMap.set('DAY SCHOLAR', {
-          hostel: 'DAY SCHOLAR',
-          totalCapacity: 0, // No capacity limit for day scholars
-          filled: 0,
-          vacancy: 0,
-          batches: dayScholarBatchCounts,
-        });
+        if (!hostelMap.has(hostelName)) {
+          // Handle hostels not in the predefined list (shouldn't happen now with the code above)
+          const batchCounts: Record<string, number> = {};
+          batchesSet.forEach(batch => {
+            batchCounts[batch as string] = 0;
+          });
+          
+          hostelMap.set(hostelName, {
+            hostel: hostelName,
+            totalCapacity: 0, // Unknown capacity
+            filled: 0,
+            vacancy: 0,
+            batches: batchCounts,
+          });
+        }
         
-        // Add any additional hostels found in student data that aren't in hostelCapacities
-        joinedStudents.forEach(student => {
-          if (!student.hostel) return;
-          
-          const hostelName = student.hostel === 'DS' ? 'DAY SCHOLAR' : student.hostel;
-          
-          if (!hostelMap.has(hostelName)) {
-            const batchCounts: Record<string, number> = {};
-            batchesSet.forEach(batch => {
-              batchCounts[batch as string] = 0;
-            });
-            
-            hostelMap.set(hostelName, {
-              hostel: hostelName,
-              totalCapacity: 0, // Unknown capacity
-              filled: 0,
-              vacancy: 0,
-              batches: batchCounts,
-            });
-          }
-        });
+        const summary = hostelMap.get(hostelName)!;
+        summary.filled++;
+        if (summary.totalCapacity > 0) {
+          summary.vacancy = summary.totalCapacity - summary.filled;
+        }
         
-        // Count students by hostel and batch
-        joinedStudents.forEach(student => {
-          if (!student.hostel || !student.batch) return;
-          
-          const hostelName = student.hostel === 'DS' ? 'DAY SCHOLAR' : student.hostel;
-          
-          if (!hostelMap.has(hostelName)) {
-            // Handle hostels not in the predefined list (shouldn't happen now with the code above)
-            const batchCounts: Record<string, number> = {};
-            batchesSet.forEach(batch => {
-              batchCounts[batch as string] = 0;
-            });
-            
-            hostelMap.set(hostelName, {
-              hostel: hostelName,
-              totalCapacity: 0, // Unknown capacity
-              filled: 0,
-              vacancy: 0,
-              batches: batchCounts,
-            });
-          }
-          
-          const summary = hostelMap.get(hostelName)!;
-          summary.filled++;
-          if (summary.totalCapacity > 0) {
-            summary.vacancy = summary.totalCapacity - summary.filled;
-          }
-          
-          if (student.batch && summary.batches[student.batch] !== undefined) {
-            summary.batches[student.batch]++;
-          }
-        });
+        if (student.batch && summary.batches[student.batch] !== undefined) {
+          summary.batches[student.batch]++;
+        }
+      });
+      
+      // Sort hostel summaries, but put DAY SCHOLAR at the end
+      const sortedHostelSummaries = Array.from(hostelMap.values()).sort((a, b) => {
+        if (a.hostel === 'DAY SCHOLAR') return 1;
+        if (b.hostel === 'DAY SCHOLAR') return -1;
+        return a.hostel.localeCompare(b.hostel);
+      });
+      
+      setHostelSummaries(sortedHostelSummaries);
+      
+      // Process gender summary
+      const genderSummary = {
+        hostelers: { boys: 0, girls: 0 },
+        dayScholars: { boys: 0, girls: 0 },
+      };
+      
+      joinedStudents.forEach(student => {
+        if (!student.hostel || !student.gender) return;
         
-        // Sort hostel summaries, but put DAY SCHOLAR at the end
-        const sortedHostelSummaries = Array.from(hostelMap.values()).sort((a, b) => {
-          if (a.hostel === 'DAY SCHOLAR') return 1;
-          if (b.hostel === 'DAY SCHOLAR') return -1;
-          return a.hostel.localeCompare(b.hostel);
-        });
+        const isDayScholar = student.hostel === 'DS' || student.hostel === 'DAY SCHOLAR';
+        const isMale = student.gender === 'M';
         
-        setHostelSummaries(sortedHostelSummaries);
-        
-        // Process gender summary
-        const genderSummary = {
-          hostelers: { boys: 0, girls: 0 },
-          dayScholars: { boys: 0, girls: 0 },
-        };
-        
-        joinedStudents.forEach(student => {
-          if (!student.hostel || !student.gender) return;
-          
-          const isDayScholar = student.hostel === 'DS' || student.hostel === 'DAY SCHOLAR';
-          const isMale = student.gender === 'M';
-          
-          if (isDayScholar) {
-            if (isMale) {
-              genderSummary.dayScholars.boys++;
-            } else {
-              genderSummary.dayScholars.girls++;
-            }
+        if (isDayScholar) {
+          if (isMale) {
+            genderSummary.dayScholars.boys++;
           } else {
-            if (isMale) {
-              genderSummary.hostelers.boys++;
-            } else {
-              genderSummary.hostelers.girls++;
-            }
+            genderSummary.dayScholars.girls++;
           }
-        });
-        
-        setGenderSummary(genderSummary);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error initializing analytics data:', error);
-        setLoading(false);
-      }
-    };
-    
-    initializeData();
-  }, [studentStore]);
+        } else {
+          if (isMale) {
+            genderSummary.hostelers.boys++;
+          } else {
+            genderSummary.hostelers.girls++;
+          }
+        }
+      });
+      
+      setGenderSummary(genderSummary);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error initializing analytics data:', error);
+      setLoading(false);
+    }
+  };
   
   // Prepare data for charts - use all batch summaries, not just top 10
   const batchStrengthData = batchSummaries.map(summary => ({
@@ -436,9 +425,29 @@ const Analytics: React.FC = observer(() => {
     exportToExcel(flattenedHostelData, 'hostel-allocation', headers, 'Hostel Allocation');
   };
   
+  // Function to refresh hostel capacities and update the analytics
+  const refreshCapacities = async () => {
+    setLoading(true);
+    try {
+      // First fetch the latest configs (including hostel capacities)
+      await studentStore.fetchAllConfigs();
+      
+      // Then reinitialize all the analytics data
+      await initializeData();
+      
+      toast.success("Hostel capacities updated successfully");
+    } catch (error) {
+      console.error("Error refreshing capacities:", error);
+      toast.error("Failed to refresh hostel capacities");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   if (loading) {
     return (
       <Layout>
+        <Toaster position="top-right" />
         <div className="p-4 text-center">
           <div className="text-lg">Loading analytics data...</div>
         </div>
@@ -448,6 +457,7 @@ const Analytics: React.FC = observer(() => {
   
   return (
     <Layout>
+      <Toaster position="top-right" />
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Analytics</h1>
         <p className="text-gray-600">
@@ -606,22 +616,22 @@ const Analytics: React.FC = observer(() => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {summary.strength}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${summary.studyMaterialDue > 1 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                         {summary.studyMaterialDue}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${summary.uniformDue > 1 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                         {summary.uniformDue}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${summary.idCardDue > 1 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                         {summary.idCardDue}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${summary.tabDue > 1 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                         {summary.tabDue}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${summary.feeDue > 1 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                         {summary.feeDue}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${summary.feeDueAmount > 1 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                         ₹{summary.feeDueAmount.toLocaleString()}
                       </td>
                     </tr>
@@ -637,22 +647,22 @@ const Analytics: React.FC = observer(() => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                       {batchSummaries.reduce((sum, summary) => sum + summary.strength, 0)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${batchSummaries.reduce((sum, summary) => sum + summary.studyMaterialDue, 0) > 1 ? 'text-red-600' : 'text-gray-900'}`}>
                       {batchSummaries.reduce((sum, summary) => sum + summary.studyMaterialDue, 0)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${batchSummaries.reduce((sum, summary) => sum + summary.uniformDue, 0) > 1 ? 'text-red-600' : 'text-gray-900'}`}>
                       {batchSummaries.reduce((sum, summary) => sum + summary.uniformDue, 0)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${batchSummaries.reduce((sum, summary) => sum + summary.idCardDue, 0) > 1 ? 'text-red-600' : 'text-gray-900'}`}>
                       {batchSummaries.reduce((sum, summary) => sum + summary.idCardDue, 0)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${batchSummaries.reduce((sum, summary) => sum + summary.tabDue, 0) > 1 ? 'text-red-600' : 'text-gray-900'}`}>
                       {batchSummaries.reduce((sum, summary) => sum + summary.tabDue, 0)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${batchSummaries.reduce((sum, summary) => sum + summary.feeDue, 0) > 1 ? 'text-red-600' : 'text-gray-900'}`}>
                       {batchSummaries.reduce((sum, summary) => sum + summary.feeDue, 0)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${batchSummaries.reduce((sum, summary) => sum + summary.feeDueAmount, 0) > 1 ? 'text-red-600' : 'text-gray-900'}`}>
                       ₹{batchSummaries.reduce((sum, summary) => sum + summary.feeDueAmount, 0).toLocaleString()}
                     </td>
                   </tr>
@@ -665,36 +675,30 @@ const Analytics: React.FC = observer(() => {
       
       {/* Hostel Summary Table */}
       <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Hostel Allocation</h2>
-          <div className="flex gap-2">
-            <Button 
-              variant="secondary"
-              size="sm"
-              onClick={exportHostelAllocation}
-              className="flex items-center"
-            >
-              <Download size={16} className="mr-2" />
-              CSV
-            </Button>
-            <Button 
-              variant="secondary"
-              size="sm"
-              onClick={exportHostelAllocationExcel}
-              className="flex items-center"
-            >
-              <FileSpreadsheet size={16} className="mr-2" />
-              Excel
-            </Button>
-            <Button 
-              variant="secondary"
-              size="sm"
-              onClick={exportHostelAllocationPDF}
-              className="flex items-center"
-            >
-              <FileText size={16} className="mr-2" />
-              PDF
-            </Button>
+        <div className="p-6 bg-white rounded-lg shadow-md">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Hostel Allocation</h2>
+            <div className="flex gap-2">
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={refreshCapacities}
+              >
+                Refresh Capacities
+              </Button>
+              <Button variant="secondary" size="sm" onClick={exportHostelAllocation}>
+                <Download size={16} className="mr-1" />
+                CSV
+              </Button>
+              <Button variant="secondary" size="sm" onClick={exportHostelAllocationPDF}>
+                <FileText size={16} className="mr-1" />
+                PDF
+              </Button>
+              <Button variant="secondary" size="sm" onClick={exportHostelAllocationExcel}>
+                <FileSpreadsheet size={16} className="mr-1" />
+                Excel
+              </Button>
+            </div>
           </div>
         </div>
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -735,7 +739,15 @@ const Analytics: React.FC = observer(() => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {summary.filled}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                        summary.totalCapacity 
+                          ? (summary.vacancy <= 2 
+                              ? 'text-red-600 font-medium' 
+                              : summary.vacancy <= 10 
+                                ? 'text-blue-600 font-medium' 
+                                : 'text-gray-500')
+                          : 'text-gray-500'
+                      }`}>
                         {summary.totalCapacity ? summary.vacancy : 'N/A'}
                       </td>
                       {/* Render all batch counts */}
@@ -757,7 +769,16 @@ const Analytics: React.FC = observer(() => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                       {hostelSummaries.reduce((sum, summary) => sum + summary.filled, 0)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${
+                      (() => {
+                        const totalVacancy = hostelSummaries.reduce((sum, summary) => sum + (summary.vacancy || 0), 0);
+                        return totalVacancy <= 2 
+                          ? 'text-red-600' 
+                          : totalVacancy <= 10 
+                            ? 'text-blue-600' 
+                            : 'text-gray-900';
+                      })()
+                    }`}>
                       {hostelSummaries.reduce((sum, summary) => sum + (summary.vacancy || 0), 0)}
                     </td>
                     {/* Total for each batch column */}

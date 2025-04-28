@@ -12,8 +12,12 @@ const SampleHourCSV: React.FC = () => {
       'CLASS TEACHER',
       'YEAR',
       'MODE',
-      'FACULTY1',
-      'FACULTY2',
+      'FACULTY1 CODE',
+      'FACULTY1 NAME',
+      'FACULTY2 CODE',
+      'FACULTY2 NAME',
+      'FACULTY3 CODE',
+      'FACULTY3 NAME',
       'BATCH',
       'EXAM DATE',
       'ALLOTED HOURS',
@@ -38,8 +42,12 @@ const SampleHourCSV: React.FC = () => {
         'ANANDALAKSHMI',
         '2026',
         'OFFLINE',
-        'BDZ',
-        '',
+        'BDZ',              // Faculty1 Code
+        'Dr. Bina Diaz',    // Faculty1 Name
+        '',                 // Faculty2 Code
+        '',                 // Faculty2 Name
+        '',                 // Faculty3 Code
+        '',                 // Faculty3 Name
         'BATCH1',
         '23-02-2025',
         '12',
@@ -62,8 +70,12 @@ const SampleHourCSV: React.FC = () => {
         'JOHN.DOE',
         '2026',
         'OFFLINE',
-        'PHY1',
-        'PHY2',
+        'PHY1',                // Faculty1 Code
+        'Dr. Richard Feynman', // Faculty1 Name
+        'PHY2',                // Faculty2 Code
+        'Dr. Albert Einstein', // Faculty2 Name
+        '',                    // Faculty3 Code
+        '',                    // Faculty3 Name
         'BATCH2',
         '24-02-2025',
         '8',
@@ -86,8 +98,12 @@ const SampleHourCSV: React.FC = () => {
         'JANE.SMITH',
         '2026',
         'ONLINE',
-        'MTH1',
-        '',
+        'MTH1',                // Faculty1 Code
+        'Dr. Paul Erdős',      // Faculty1 Name
+        '',                    // Faculty2 Code
+        '',                    // Faculty2 Name
+        '',                    // Faculty3 Code
+        '',                    // Faculty3 Name
         'BATCH3',
         '25-02-2025',
         '10',
@@ -144,6 +160,7 @@ const SampleHourCSV: React.FC = () => {
       </Button>
       <p className="text-xs text-gray-500 mt-1">
         Note: CSV must include EXAM DATE column (not just DATE). Date format should be DD-MM-YYYY.
+        Both faculty code and name fields are included for better data organization.
       </p>
     </div>
   );

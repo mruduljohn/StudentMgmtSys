@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trash2, UserPlus, Edit, Key } from 'lucide-react';
+import { Trash2, UserPlus, Edit, Key, Search } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -26,6 +26,8 @@ const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuthStore();
   const { batchConfig } = useStudentStore();
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -63,6 +65,24 @@ const UserManagement: React.FC = () => {
     fetchUsers();
   }, []);
   
+  // Filter users when search query changes
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredUsers(users);
+      return;
+    }
+    
+    const query = searchQuery.toLowerCase().trim();
+    const filtered = users.filter(user => 
+      user.username.toLowerCase().includes(query) || 
+      user.name.toLowerCase().includes(query) || 
+      user.email.toLowerCase().includes(query) ||
+      (user.class && user.class.toLowerCase().includes(query))
+    );
+    
+    setFilteredUsers(filtered);
+  }, [searchQuery, users]);
+  
   // Set admin delete confirmation text when selectedUser changes
   useEffect(() => {
     if (selectedUser?.role === 'ADMIN') {
@@ -76,12 +96,21 @@ const UserManagement: React.FC = () => {
       const data = await getAllUsers();
       console.log('Fetched users data:', data);
       setUsers(data.users || []);
+      setFilteredUsers(data.users || []);
       setIsLoading(false);
     } catch (error) {
       console.error('Error fetching users:', error);
       setError('Failed to load users');
       setIsLoading(false);
     }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -231,10 +260,39 @@ const UserManagement: React.FC = () => {
       )}
       
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-lg font-semibold mb-4">System Users</h2>
+        <div className="flex flex-col md:flex-row justify-between mb-6">
+          <h2 className="text-lg font-semibold mb-4 md:mb-0">System Users</h2>
+          
+          {/* Search input */}
+          <div className="relative w-full md:w-64">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search size={16} className="text-gray-400" />
+            </div>
+            <Input
+              type="text"
+              placeholder="Search users..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="pl-10 pr-10"
+              fullWidth
+            />
+            {searchQuery && (
+              <button
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                onClick={clearSearch}
+              >
+                <span className="text-gray-400 hover:text-gray-600 text-xl">&times;</span>
+              </button>
+            )}
+          </div>
+        </div>
         
-        {users.length === 0 ? (
-          <p className="text-gray-500">No users found.</p>
+        {filteredUsers.length === 0 ? (
+          <p className="text-gray-500">
+            {searchQuery 
+              ? "No users found matching your search." 
+              : "No users found."}
+          </p>
         ) : isLoading ? (
           <div className="flex justify-center items-center h-64">
             <div className="text-lg">Loading user data...</div>
@@ -248,7 +306,7 @@ const UserManagement: React.FC = () => {
               { id: 'role', label: 'Role' },
               { id: 'class', label: 'Assigned Class' }
             ]}
-            data={users.map(user => ({
+            data={filteredUsers.map(user => ({
               ...user,
               role: user.role === 'ADMIN' ? 'Admin' : 'Mentor',
               class: user.class || '-'
@@ -282,7 +340,7 @@ const UserManagement: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <tr key={user.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {user.username}

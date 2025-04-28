@@ -1234,6 +1234,14 @@ export const uploadHoursCSV = async (req: Request, res: Response): Promise<void>
       else if (headerLower === 'remaining hours' || headerLower === 'remaininghours' || headerLower === 'remaining hours needed') headerMapping[index] = 'remainingHours';
       else if (headerLower === 'chapter status' || headerLower === 'chapterstatus') headerMapping[index] = 'chapterStatus';
       else if (headerLower === 'exam date' || headerLower === 'examdate') headerMapping[index] = 'examDate';
+      // Faculty code and name mappings
+      else if (headerLower === 'faculty1 code' || headerLower === 'faculty1code') headerMapping[index] = 'faculty1Code';
+      else if (headerLower === 'faculty1 name' || headerLower === 'faculty1name') headerMapping[index] = 'faculty1Name';
+      else if (headerLower === 'faculty2 code' || headerLower === 'faculty2code') headerMapping[index] = 'faculty2Code';
+      else if (headerLower === 'faculty2 name' || headerLower === 'faculty2name') headerMapping[index] = 'faculty2Name';
+      else if (headerLower === 'faculty3 code' || headerLower === 'faculty3code') headerMapping[index] = 'faculty3Code';
+      else if (headerLower === 'faculty3 name' || headerLower === 'faculty3name') headerMapping[index] = 'faculty3Name';
+      // Legacy faculty fields for backward compatibility
       else if (headerLower === 'faculty1') headerMapping[index] = 'faculty1';
       else if (headerLower === 'faculty2') headerMapping[index] = 'faculty2';
       else if (headerLower === 'faculty3') headerMapping[index] = 'faculty3';
@@ -1400,14 +1408,27 @@ export const uploadHoursCSV = async (req: Request, res: Response): Promise<void>
         
         // Process faculties if present
         const faculties = [];
-        if (hourData.faculty1) {
-          faculties.push({ name: hourData.faculty1 });
+        
+        // Process faculty code and name pairs
+        if (hourData.faculty1Code || hourData.faculty1Name || hourData.faculty1) {
+          faculties.push({
+            code: hourData.faculty1Code || '',
+            name: hourData.faculty1Name || hourData.faculty1 || ''
+          });
         }
-        if (hourData.faculty2) {
-          faculties.push({ name: hourData.faculty2 });
+        
+        if (hourData.faculty2Code || hourData.faculty2Name || hourData.faculty2) {
+          faculties.push({
+            code: hourData.faculty2Code || '',
+            name: hourData.faculty2Name || hourData.faculty2 || ''
+          });
         }
-        if (hourData.faculty3) {
-          faculties.push({ name: hourData.faculty3 });
+        
+        if (hourData.faculty3Code || hourData.faculty3Name || hourData.faculty3) {
+          faculties.push({
+            code: hourData.faculty3Code || '',
+            name: hourData.faculty3Name || hourData.faculty3 || ''
+          });
         }
         
         if (faculties.length > 0) {

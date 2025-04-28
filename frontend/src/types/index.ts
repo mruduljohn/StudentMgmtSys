@@ -148,8 +148,13 @@ export interface BatchConfig {
   batches: string[];
   teachers: string[];
   hostels: string[];
+  hostelCapacity: Record<string, number>;
   programs: string[];
   streams: string[];
+  studyMaterials: string[];
+  uniforms: string[];
+  idCards: string[];
+  tabs: string[];
 }
 
 export interface RemarksConfig {

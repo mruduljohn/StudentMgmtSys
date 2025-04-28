@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
-import { Clock, BarChart2, BookOpen, Download } from 'lucide-react';
+import { Clock, BarChart2, BookOpen, Download, Search, AlertTriangle } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useHourStore } from '../store/hourStore';
+import { useAuthStore } from '../store/authStore';
 import HourList from '../components/hours/HourList';
 import HourStats from '../components/hours/HourStats';
 import ChapterStatus from '../components/hours/ChapterStatus';
 import HourFilters from '../components/hours/HourFilters';
 import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
-import { hoursToExcel, downloadExcel, hoursToCSV, downloadCSV, hoursToPDF, downloadPDF, hourStatsToExcel, hourStatsToCSV, hourStatsToPDF } from '../utils/excelUtils';
+import { 
+  hoursToExcel, downloadExcel, hoursToCSV, downloadCSV, hoursToPDF, downloadPDF, 
+  hourStatsToExcel, hourStatsToCSV, hourStatsToPDF,
+  hoursToTransposedExcel, hoursToTransposedCSV, hoursToTransposedPDF 
+} from '../utils/excelUtils';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -44,6 +49,8 @@ function TabPanel(props: TabPanelProps) {
 
 const HourDashboard: React.FC = observer(() => {
   const hourStore = useHourStore();
+  const authStore = useAuthStore();
+  const isAdmin = authStore.user?.role === 'ADMIN';
   const [tabValue, setTabValue] = useState(0);
   const [selectedBatch, setSelectedBatch] = useState<string>('');
   const [selectedSubject, setSelectedSubject] = useState<string>('');
@@ -148,10 +155,10 @@ const HourDashboard: React.FC = observer(() => {
     
     // Update search in store
     if (tabValue === 0) {
-      // If the search query is at least 2 characters or empty, update the filter
-      if (query.length >= 2 || query === '') {
-        hourStore.setFilter('chapter', query);
-      }
+      // Immediate update for better user experience
+      hourStore.setFilter('chapter', query);
+      // Fetch with new filters
+      hourStore.fetchHours();
     }
   };
 
@@ -170,15 +177,18 @@ const HourDashboard: React.FC = observer(() => {
         
         switch (format) {
           case 'xlsx':
-            const excelData = hoursToExcel(hours);
+            // Use transposed format for Excel
+            const excelData = hoursToTransposedExcel(hours);
             setExportData(excelData);
             break;
           case 'csv':
-            const csvData = hoursToCSV(hours);
+            // Use transposed format for CSV
+            const csvData = hoursToTransposedCSV(hours);
             setExportData(csvData);
             break;
           case 'pdf':
-            const pdfDoc = hoursToPDF(hours);
+            // Use transposed format for PDF
+            const pdfDoc = hoursToTransposedPDF(hours);
             setExportData(pdfDoc);
             break;
         }
@@ -376,39 +386,41 @@ const HourDashboard: React.FC = observer(() => {
             </button>
           </div>
           
-          {/* Export Button with Dropdown */}
-          <div className="px-4 py-2 flex items-center relative">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-              className="flex items-center"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            
-            {isExportMenuOpen && (
-              <Menu
-                items={[
-                  { label: 'Excel (.xlsx)', onClick: () => handleExportFormat('xlsx') },
-                  { label: 'CSV (.csv)', onClick: () => handleExportFormat('csv') },
-                  { label: 'PDF (.pdf)', onClick: () => handleExportFormat('pdf') }
-                ]}
-                onClose={() => setIsExportMenuOpen(false)}
-                className="right-0 mt-2"
-              />
-            )}
-          </div>
+          {/* Export Button with Dropdown - Admin Only */}
+          {isAdmin && (
+            <div className="px-4 py-2 flex items-center relative">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                className="flex items-center"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              
+              {isExportMenuOpen && (
+                <Menu
+                  items={[
+                    { label: 'Excel (.xlsx)', onClick: () => handleExportFormat('xlsx') },
+                    { label: 'CSV (.csv)', onClick: () => handleExportFormat('csv') },
+                    { label: 'PDF (.pdf)', onClick: () => handleExportFormat('pdf') }
+                  ]}
+                  onClose={() => setIsExportMenuOpen(false)}
+                  className="right-0 mt-2"
+                />
+              )}
+            </div>
+          )}
         </div>
         
-        {/* Filters */}
-        <div className="p-4 border-b border-gray-200">
-          <HourFilters 
-            batches={hourStore.getOptions.batches || []}
-            subjects={hourStore.getOptions.subjects || []}
-            modes={hourStore.getOptions.modes || []}
-            classTeachers={hourStore.getOptions.classTeachers || []}
+        {/* Filters Section */}
+        <div className="mb-6">
+          <HourFilters
+            batches={hourStore.getOptions.batches}
+            subjects={hourStore.getOptions.subjects}
+            modes={hourStore.getOptions.modes}
+            classTeachers={hourStore.getOptions.classTeachers}
             selectedBatch={selectedBatch}
             selectedSubject={selectedSubject}
             selectedMode={selectedMode}
@@ -421,6 +433,8 @@ const HourDashboard: React.FC = observer(() => {
             onTeacherChange={handleTeacherChange}
             onStatusChange={handleStatusChange}
             onChapterSearch={handleChapterSearch}
+            loading={hourStore.isLoading}
+            totalResults={hourStore.getTotalHours}
           />
         </div>
         

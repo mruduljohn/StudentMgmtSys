@@ -377,26 +377,34 @@ export const downloadPDF = (doc: jsPDF, filename: string): void => {
 
 // Convert Hour objects to Excel data
 export const hoursToExcel = (hours: any[]): ArrayBuffer => {
-  const worksheet = XLSX.utils.json_to_sheet(hours.map(hour => ({
-    'Batch': hour.batch,
-    'Subject': hour.subject,
-    'Chapter': hour.chapter,
-    'Mode': hour.mode,
-    'Class Teacher': hour.classTeacher,
-    'Status': hour.chapterStatus,
-    'Exam Date': hour.date,
-    'Alloted Hours': hour.allotedHours,
-    'Completed Hours': hour.completedHours,
-    'Remaining Hours': hour.remainingHours,
-    'Average Marks': hour.averageMarksOfBatch,
-    'A+ Count': hour.numberOfAPlus,
-    'Remarks 1': hour.remarks1,
-    'Remarks 2': hour.remarks2,
-    'Flag 1': hour.flag1,
-    'Flag 2': hour.flag2,
-    'Created At': hour.createdAt,
-    'Updated At': hour.updatedAt
-  })));
+  const worksheet = XLSX.utils.json_to_sheet(hours.map(hour => {
+    // Extract faculty information
+    const facultyNames = hour.faculties?.map((f: any) => f.name).join(', ') || '';
+    const facultyCodes = hour.faculties?.map((f: any) => f.code).join(', ') || '';
+    
+    return {
+      'Batch': hour.batch,
+      'Subject': hour.subject,
+      'Chapter': hour.chapter,
+      'Mode': hour.mode,
+      'Class Teacher': hour.classTeacher,
+      'Faculty Code': facultyCodes,
+      'Faculty Name': facultyNames,
+      'Status': hour.chapterStatus,
+      'Exam Date': hour.date,
+      'Alloted Hours': hour.allotedHours,
+      'Completed Hours': hour.completedHours,
+      'Remaining Hours': hour.remainingHours,
+      'Average Marks': hour.averageMarksOfBatch,
+      'A+ Count': hour.numberOfAPlus,
+      'Remarks 1': hour.remarks1,
+      'Remarks 2': hour.remarks2,
+      'Flag 1': hour.flag1,
+      'Flag 2': hour.flag2,
+      'Created At': hour.createdAt,
+      'Updated At': hour.updatedAt
+    };
+  }));
   
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Hours');
@@ -406,26 +414,34 @@ export const hoursToExcel = (hours: any[]): ArrayBuffer => {
 
 // Convert Hour objects to CSV data
 export const hoursToCSV = (hours: any[]): string => {
-  const worksheet = XLSX.utils.json_to_sheet(hours.map(hour => ({
-    'Batch': hour.batch,
-    'Subject': hour.subject,
-    'Chapter': hour.chapter,
-    'Mode': hour.mode,
-    'Class Teacher': hour.classTeacher,
-    'Status': hour.chapterStatus,
-    'Exam Date': hour.date,
-    'Alloted Hours': hour.allotedHours,
-    'Completed Hours': hour.completedHours,
-    'Remaining Hours': hour.remainingHours,
-    'Average Marks': hour.averageMarksOfBatch,
-    'A+ Count': hour.numberOfAPlus,
-    'Remarks 1': hour.remarks1,
-    'Remarks 2': hour.remarks2,
-    'Flag 1': hour.flag1,
-    'Flag 2': hour.flag2,
-    'Created At': hour.createdAt,
-    'Updated At': hour.updatedAt
-  })));
+  const worksheet = XLSX.utils.json_to_sheet(hours.map(hour => {
+    // Extract faculty information
+    const facultyNames = hour.faculties?.map((f: any) => f.name).join(', ') || '';
+    const facultyCodes = hour.faculties?.map((f: any) => f.code).join(', ') || '';
+    
+    return {
+      'Batch': hour.batch,
+      'Subject': hour.subject,
+      'Chapter': hour.chapter,
+      'Mode': hour.mode,
+      'Class Teacher': hour.classTeacher,
+      'Faculty Code': facultyCodes,
+      'Faculty Name': facultyNames,
+      'Status': hour.chapterStatus,
+      'Exam Date': hour.date,
+      'Alloted Hours': hour.allotedHours,
+      'Completed Hours': hour.completedHours,
+      'Remaining Hours': hour.remainingHours,
+      'Average Marks': hour.averageMarksOfBatch,
+      'A+ Count': hour.numberOfAPlus,
+      'Remarks 1': hour.remarks1,
+      'Remarks 2': hour.remarks2,
+      'Flag 1': hour.flag1,
+      'Flag 2': hour.flag2,
+      'Created At': hour.createdAt,
+      'Updated At': hour.updatedAt
+    };
+  }));
   
   return XLSX.utils.sheet_to_csv(worksheet);
 };
@@ -434,13 +450,14 @@ export const hoursToCSV = (hours: any[]): string => {
 export const hoursToPDF = (hours: any[]): jsPDF => {
   const doc = new jsPDF('landscape');
   
-  const tableColumn = ['Batch', 'Subject', 'Chapter', 'Mode', 'Class Teacher', 'Status', 'Exam Date', 'Alloted Hrs', 'Completed Hrs', 'Remaining Hrs'];
+  const tableColumn = ['Batch', 'Subject', 'Chapter', 'Mode', 'Class Teacher', 'Faculty', 'Status', 'Exam Date', 'Alloted Hrs', 'Completed Hrs', 'Remaining Hrs'];
   const tableRows = hours.map(hour => [
     hour.batch,
     hour.subject,
     hour.chapter,
     hour.mode,
     hour.classTeacher,
+    hour.faculties?.map((f: any) => `${f.code ? f.code + ': ' : ''}${f.name || ''}`).join(', ') || '',
     hour.chapterStatus,
     hour.examDate,
     hour.allotedHours,
@@ -640,4 +657,86 @@ export const hourStatsToPDF = (stats: any): jsPDF => {
   }
   
   return doc;
+};
+
+// Transposed export functions for hours data
+
+// Convert Hour objects to Excel data in transposed format
+export const hoursToTransposedExcel = (hours: any[]): ArrayBuffer => {
+  // First, create the standard data structure
+  const hourData = hours.map(hour => {
+    // Extract faculty information
+    const facultyNames = hour.faculties?.map((f: any) => f.name).join(', ') || '';
+    const facultyCodes = hour.faculties?.map((f: any) => f.code).join(', ') || '';
+    
+    return {
+      'Batch': hour.batch,
+      'Subject': hour.subject,
+      'Chapter': hour.chapter,
+      'Mode': hour.mode,
+      'Class Teacher': hour.classTeacher,
+      'Faculty Code': facultyCodes,
+      'Faculty Name': facultyNames,
+      'Status': hour.chapterStatus,
+      'Exam Date': hour.date,
+      'Alloted Hours': hour.allotedHours,
+      'Completed Hours': hour.completedHours,
+      'Remaining Hours': hour.remainingHours,
+      'Average Marks': hour.averageMarksOfBatch,
+      'A+ Count': hour.numberOfAPlus,
+      'Remarks 1': hour.remarks1,
+      'Remarks 2': hour.remarks2,
+      'Flag 1': hour.flag1,
+      'Flag 2': hour.flag2,
+      'Created At': hour.createdAt,
+      'Updated At': hour.updatedAt
+    };
+  });
+  
+  // Now transpose the data
+  if (hourData.length === 0) {
+    // Empty data, return empty workbook
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet([['No data available']]);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Hours');
+    return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  }
+  
+  // Get all field names (column headers to become row headers)
+  const headers = Object.keys(hourData[0]);
+  
+  // Create the transposed array
+  // First row will be header row with numbered entries
+  const transposedData = [
+    ['Field', ...hourData.map((_, index) => `Entry ${index + 1}`)]
+  ];
+  
+  // Add a row for each field
+  headers.forEach(header => {
+    const row = [header];
+    // Add values for each hour
+    hourData.forEach(hour => {
+      row.push(hour[header]);
+    });
+    transposedData.push(row);
+  });
+  
+  // Create the workbook
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.aoa_to_sheet(transposedData);
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Hours');
+  
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+};
+
+// Convert Hour objects to CSV data - using normal format, not transposed
+export const hoursToTransposedCSV = (hours: any[]): string => {
+  // Use the standard CSV export function
+  return hoursToCSV(hours);
+};
+
+// Convert Hour objects to PDF - using normal format, not transposed
+export const hoursToTransposedPDF = (hours: any[]): jsPDF => {
+  // Use the standard PDF export function
+  return hoursToPDF(hours);
 };

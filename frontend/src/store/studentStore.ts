@@ -69,8 +69,13 @@ class StudentStore {
     batches: [],
     teachers: [],
     hostels: [],
+    hostelCapacity: {},
     programs: [],
     streams: [],
+    studyMaterials: ['NOT RECEIVED', 'RECEIVED', 'PARTIALLY RECEIVED'],
+    uniforms: ['NOT RECEIVED', 'RECEIVED', 'PARTIALLY RECEIVED'],
+    idCards: ['NOT RECEIVED', 'RECEIVED'],
+    tabs: ['REQUESTED NOT PAID', 'RECEIVED PAID', 'RECEIVED NOT PAID', 'REQUESTED PAID', 'PERSONAL TAB', 'NOT REQUIRED'],
   });
 
   remarksConfig = observable<RemarksConfig>({
@@ -634,15 +639,31 @@ class StudentStore {
       // Update hostels
       await updateConfig('hostels', config.hostels);
       
+      // Update hostel capacities
+      await updateConfig('hostelCapacity', [JSON.stringify(config.hostelCapacity)]);
+      
       // Update programs
       await updateConfig('programs', config.programs);
       
       // Update streams
       await updateConfig('streams', config.streams);
       
+      // Update studyMaterials
+      await updateConfig('studyMaterials', config.studyMaterials);
+      
+      // Update uniforms
+      await updateConfig('uniforms', config.uniforms);
+      
+      // Update idCards
+      await updateConfig('idCards', config.idCards);
+      
+      // Update tabs
+      await updateConfig('tabs', config.tabs);
+      
       // Update local state
       runInAction(() => {
-        this.batchConfig = config;
+        // Use Object.assign to update the observable
+        Object.assign(this.batchConfig, config);
         this.loading.set(false);
       });
       
@@ -685,15 +706,24 @@ class StudentStore {
     }
   });
 
-  updateFlagsConfig = action(async (config: FlagsConfig) => {
+  updateFlagsConfig = action(async (config: FlagsConfig, predefinedOptions?: Record<keyof FlagsConfig, string[]>) => {
     try {
       this.loading.set(true);
       
-      // Update flags config in the backend
+      // Update flag labels in the backend
       await updateConfig('flag1', [config.flag1]);
       await updateConfig('flag2', [config.flag2]);
       await updateConfig('flag3', [config.flag3]);
       await updateConfig('flag4', [config.flag4]);
+      
+      // Store predefined flag options if provided
+      if (predefinedOptions) {
+        // Store each flag's predefined options with a prefix to separate from regular configs
+        await updateConfig('predefined_flag1', predefinedOptions.flag1);
+        await updateConfig('predefined_flag2', predefinedOptions.flag2);
+        await updateConfig('predefined_flag3', predefinedOptions.flag3);
+        await updateConfig('predefined_flag4', predefinedOptions.flag4);
+      }
       
       // Update local state
       runInAction(() => {

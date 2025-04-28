@@ -104,8 +104,10 @@ class HourStore {
   });
   
   setFilter = action((key: string, value: string | number | boolean) => {
+    // Update the filter
     this.filters.set(key, value);
-    this.currentPage.set(1); // Reset to first page when filtering
+    // Reset to first page when filtering
+    this.currentPage.set(1);
   });
   
   setFilters = action((filters: Record<string, string | number | boolean>) => {
@@ -143,7 +145,8 @@ class HourStore {
   });
   
   fetchHours = action(async () => {
-    this.setLoading(true);
+    // Set loading state immediately
+    this.loading.set(true);
     
     try {
       // Request a larger page size to handle client-side sorting
@@ -161,6 +164,8 @@ class HourStore {
       this.filters.forEach((value, key) => {
         params[key] = value;
       });
+      
+      console.log('Fetching hours with params:', params);
       
       // Store the API response outside of any MobX actions
       const response = await fetchHours(params);
@@ -183,15 +188,15 @@ class HourStore {
         this.hours.replace(paginatedHours);
         this.totalHours.set(sortedHours.length);
         this.totalPages.set(totalPages);
+        this.loading.set(false); // Move this inside runInAction to ensure atomic updates
       });
     } catch (error) {
       // Handle errors within runInAction as well
       runInAction(() => {
         console.error("Error fetching hours:", error);
         this.error.set("Failed to fetch hours");
+        this.loading.set(false); // Make sure loading is set to false in case of error
       });
-    } finally {
-      this.setLoading(false);
     }
   });
   

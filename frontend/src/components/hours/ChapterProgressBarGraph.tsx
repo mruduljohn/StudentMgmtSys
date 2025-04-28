@@ -225,7 +225,7 @@ const ChapterProgressBarGraph: React.FC<ChapterProgressBarGraphProps> = observer
                   const { payload } = props;
                   if (name === 'totalHours') {
                     return [
-                      `${value} / ${payload.allotedHours} hours (${payload.progress}%)`, 
+                      `${payload.totalHours}/${payload.allotedHours} hours (${payload.progress}%)`, 
                       'Hours Completed'
                     ];
                   }

@@ -24,10 +24,10 @@ export const getFieldConfigs = (): FieldConfig[] => [
     editable: true 
   },
   { id: 'program', label: 'Program', type: 'select', editable: true },
-  { id: 'studyMaterial', label: 'Study Material', type: 'text', editable: true },
-  { id: 'uniform', label: 'Uniform', type: 'text', editable: true },
-  { id: 'idCard', label: 'ID Card', type: 'text', editable: true },
-  { id: 'tab', label: 'Tab', type: 'text', editable: true },
+  { id: 'studyMaterial', label: 'Study Material', type: 'select', editable: true },
+  { id: 'uniform', label: 'Uniform', type: 'select', editable: true },
+  { id: 'idCard', label: 'ID Card', type: 'select', editable: true },
+  { id: 'tab', label: 'Tab', type: 'select', editable: true },
   { 
     id: 'joined', 
     label: 'Joined', 
@@ -64,8 +64,8 @@ export const getFieldConfigs = (): FieldConfig[] => [
   { id: 'remarks3', label: 'Remarks 3', type: 'text', editable: true },
   { id: 'remarks4', label: 'Remarks 4', type: 'text', editable: true },
   { id: 'feeDue', label: 'Fee Due', type: 'number', editable: true },
-  { id: 'flag1', label: 'Flag 1', type: 'text', editable: true },
-  { id: 'flag2', label: 'Flag 2', type: 'text', editable: true },
-  { id: 'flag3', label: 'Flag 3', type: 'text', editable: true },
-  { id: 'flag4', label: 'Flag 4', type: 'text', editable: true },
+  { id: 'flag1', label: 'Flag 1', type: 'select', editable: true },
+  { id: 'flag2', label: 'Flag 2', type: 'select', editable: true },
+  { id: 'flag3', label: 'Flag 3', type: 'select', editable: true },
+  { id: 'flag4', label: 'Flag 4', type: 'select', editable: true },
 ];

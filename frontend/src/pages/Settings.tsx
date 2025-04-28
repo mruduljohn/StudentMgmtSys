@@ -22,22 +22,11 @@ const Settings: React.FC = () => {
     updateSubjectChapters,
     initializeDefaultSubjectChapters,
     getSubjectChapters,
+    fetchStats
   } = useStudentStore();
   
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
-  
-  const [batchSettings, setBatchSettings] = useState<BatchConfig>({ ...batchConfig });
-  const [remarksSettings, setRemarksSettings] = useState<RemarksConfig>({ ...remarksConfig });
-  const [flagsSettings, setFlagsSettings] = useState<FlagsConfig>({ ...flagsConfig });
-  const [subjectChapters, setSubjectChapters] = useState<Record<string, string[]>>({});
-  const [selectedSubject, setSelectedSubject] = useState<string>('PHYSICS');
-  const [chapterText, setChapterText] = useState<string>('');
-  
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [saveError, setSaveError] = useState(false);
-  const [chaptersLoading, setChaptersLoading] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   
   // Predefined values
   const predefinedBatches = [
@@ -58,7 +47,9 @@ const Settings: React.FC = () => {
   ];
   
   const predefinedHostels = [
-    'BOYS HOSTEL', 'GIRLS HOSTEL', 'DAY SCHOLAR'
+    'BOYS HOSTEL,150', 
+    'GIRLS HOSTEL,120', 
+    'DAY SCHOLAR'
   ];
   
   const predefinedStreams = ['FOUNDATION', 'ENGINEERING', 'MEDICAL'];
@@ -67,12 +58,72 @@ const Settings: React.FC = () => {
   
   const predefinedSubjects = ['PHYSICS', 'CHEMISTRY', 'BOTANY', 'ZOOLOGY', 'MATHS'];
   
+  const predefinedStudyMaterials = ['NOT RECEIVED', 'RECEIVED', 'PARTIALLY RECEIVED'];
+  
+  const predefinedUniforms = ['NOT RECEIVED', 'RECEIVED', 'PARTIALLY RECEIVED'];
+  
+  const predefinedIdCards = ['NOT RECEIVED', 'RECEIVED'];
+  
+  const predefinedTabs = ['REQUESTED NOT PAID', 'RECEIVED PAID', 'RECEIVED NOT PAID', 'REQUESTED PAID', 'PERSONAL TAB', 'NOT REQUIRED'];
+  
+  const [predefinedFlags, setPredefinedFlags] = useState({
+    flag1: ['PENDING', 'COMPLETED', 'URGENT', 'REVIEW'],
+    flag2: ['HIGH', 'MEDIUM', 'LOW', 'CRITICAL'],
+    flag3: ['ACADEMIC', 'BEHAVIORAL', 'ATTENDANCE', 'HEALTH'],
+    flag4: ['ACTIVE', 'INACTIVE', 'SUSPENDED', 'PROBATION']
+  });
+  
+  const [batchSettings, setBatchSettings] = useState<BatchConfig>({ 
+    ...batchConfig,
+    hostelCapacity: batchConfig.hostelCapacity || {},
+    studyMaterials: batchConfig.studyMaterials || predefinedStudyMaterials,
+    uniforms: batchConfig.uniforms || predefinedUniforms,
+    idCards: batchConfig.idCards || predefinedIdCards,
+    tabs: batchConfig.tabs || predefinedTabs,
+  });
+  const [remarksSettings, setRemarksSettings] = useState<RemarksConfig>({ ...remarksConfig });
+  const [flagsSettings, setFlagsSettings] = useState<FlagsConfig>({ ...flagsConfig });
+  const [subjectChapters, setSubjectChapters] = useState<Record<string, string[]>>({});
+  const [selectedSubject, setSelectedSubject] = useState<string>('PHYSICS');
+  const [chapterText, setChapterText] = useState<string>('');
+  
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [chaptersLoading, setChaptersLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Add state for editing predefined flags
+  const [editingPredefinedFlag, setEditingPredefinedFlag] = useState<keyof FlagsConfig | null>(null);
+  const [customFlagValues, setCustomFlagValues] = useState<string>('');
+  
+  const [hostelOccupancy, setHostelOccupancy] = useState<Record<string, number>>({}); // Used for analytics page
+  
   // Effect to handle config changes
   useEffect(() => {
     setBatchSettings({ ...batchConfig });
     setRemarksSettings({ ...remarksConfig });
     setFlagsSettings({ ...flagsConfig });
   }, [batchConfig, remarksConfig, flagsConfig]);
+  
+  // Load predefined flag options when the component mounts
+  useEffect(() => {
+    const fetchConfigData = async () => {
+      try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+          const data = await response.json();
+          // If the API returned predefined flag options, use them
+          if (data.predefinedFlagOptions) {
+            setPredefinedFlags(data.predefinedFlagOptions);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching predefined flag options:', error);
+      }
+    };
+    
+    fetchConfigData();
+  }, []);
   
   // Effect to load subject chapters once when component mounts
   useEffect(() => {
@@ -245,10 +296,48 @@ const Settings: React.FC = () => {
         return false;
       });
     
-    setBatchSettings(prev => ({
-      ...prev,
-      [field]: values,
-    }));
+    setBatchSettings(prev => {
+      // Handle special case for hostels to extract capacities
+      if (field === 'hostels') {
+        const hostels: string[] = [];
+        const hostelCapacity: Record<string, number> = { ...prev.hostelCapacity };
+        
+        values.forEach(hostelEntry => {
+          // Check if the entry has capacity info (format: "Hostel Name,42")
+          const parts = hostelEntry.split(',');
+          if (parts.length === 2) {
+            const hostelName = parts[0].trim();
+            const capacityStr = parts[1].trim();
+            const capacity = parseInt(capacityStr, 10);
+            
+            if (!isNaN(capacity) && capacity >= 0) {
+              hostels.push(hostelName);
+              hostelCapacity[hostelName] = capacity;
+            } else {
+              hostels.push(hostelEntry); // Keep the original format if number parsing fails
+              // Show a toast notification if an invalid capacity is entered
+              if (capacityStr !== '') {
+                toast.error(`Invalid capacity value for ${hostelName}: "${capacityStr}". Must be a non-negative number.`);
+              }
+            }
+          } else {
+            hostels.push(hostelEntry);
+          }
+        });
+        
+        return {
+          ...prev,
+          hostels,
+          hostelCapacity,
+        };
+      }
+      
+      // For other fields, use normal behavior
+      return {
+        ...prev,
+        [field]: values,
+      };
+    });
   };
   
   const handleRemarksChange = (
@@ -271,6 +360,24 @@ const Settings: React.FC = () => {
     }));
   };
   
+  const handleLoadPredefinedFlag = (field: keyof FlagsConfig, options: string[]) => {
+    // Display dropdown to select from options
+    const selectedValue = window.prompt(
+      `Select a predefined value for ${field}:\n${options.map((opt, idx) => `${idx + 1}. ${opt}`).join('\n')}`,
+      '1'
+    );
+    
+    if (selectedValue !== null) {
+      const index = parseInt(selectedValue, 10) - 1;
+      if (!isNaN(index) && index >= 0 && index < options.length) {
+        setFlagsSettings(prev => ({
+          ...prev,
+          [field]: options[index],
+        }));
+      }
+    }
+  };
+  
   const handleSave = async () => {
     try {
       setIsLoading(true);
@@ -284,7 +391,8 @@ const Settings: React.FC = () => {
       const remarksResult = await updateRemarksConfig(remarksSettings);
       
       // Update flags settings using store function
-      const flagsResult = await updateFlagsConfig(flagsSettings);
+      // Also pass in the predefined flag values
+      const flagsResult = await updateFlagsConfig(flagsSettings, predefinedFlags);
       
       // Save current subject chapters if they've been modified
       if (chapterText) {
@@ -321,10 +429,43 @@ const Settings: React.FC = () => {
   };
   
   const handleLoadPredefined = (field: keyof BatchConfig, values: string[]) => {
-    setBatchSettings(prev => ({
-      ...prev,
-      [field]: values,
-    }));
+    setBatchSettings(prev => {
+      // Special handling for hostels to maintain capacities
+      if (field === 'hostels') {
+        const hostels: string[] = [];
+        const hostelCapacity: Record<string, number> = { ...prev.hostelCapacity };
+        
+        // Process each predefined hostel for capacity
+        values.forEach(hostelEntry => {
+          const parts = hostelEntry.split(',');
+          if (parts.length === 2) {
+            const hostelName = parts[0].trim();
+            const capacity = parseInt(parts[1].trim(), 10);
+            
+            if (!isNaN(capacity) && capacity >= 0) {
+              hostels.push(hostelName);
+              hostelCapacity[hostelName] = capacity;
+            } else {
+              hostels.push(hostelEntry);
+            }
+          } else {
+            hostels.push(hostelEntry);
+          }
+        });
+        
+        return {
+          ...prev,
+          hostels,
+          hostelCapacity
+        };
+      }
+      
+      // Normal handling for other fields
+      return {
+        ...prev,
+        [field]: values,
+      };
+    });
   };
   
   const handleInitializeSubjectChapters = async () => {
@@ -345,6 +486,98 @@ const Settings: React.FC = () => {
     } finally {
       setChaptersLoading(false);
     }
+  };
+  
+  // Handle opening the modal for editing predefined values
+  const handleOpenFlagValueEditor = (flag: keyof FlagsConfig) => {
+    setEditingPredefinedFlag(flag);
+    setCustomFlagValues(predefinedFlags[flag].join('\n'));
+  };
+
+  // Handle saving custom flag values
+  const handleSaveCustomFlagValues = async () => {
+    if (!editingPredefinedFlag) return;
+    
+    const values = customFlagValues
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+    
+    if (values.length === 0) {
+      toast.error('Please provide at least one value');
+      return;
+    }
+    
+    try {
+      // Update the local predefined flags object using setter
+      const updatedPredefinedFlags = {
+        ...predefinedFlags,
+        [editingPredefinedFlag]: values
+      };
+      
+      setPredefinedFlags(updatedPredefinedFlags);
+      
+      // Save the updated predefined flag options to the database
+      await updateFlagsConfig(flagsSettings, updatedPredefinedFlags);
+      
+      toast.success(`Predefined values for ${editingPredefinedFlag} updated`);
+      setEditingPredefinedFlag(null);
+    } catch (error) {
+      console.error('Error saving predefined flag values:', error);
+      toast.error('Failed to save predefined flag values');
+    }
+  };
+  
+  const formatHostelsWithCapacity = (hostels: string[], hostelCapacity: Record<string, number>): string => {
+    return hostels.map(hostel => {
+      // Check if the hostel has a capacity value (including 0)
+      if (Object.prototype.hasOwnProperty.call(hostelCapacity, hostel)) {
+        const capacity = hostelCapacity[hostel];
+        return `${hostel},${capacity}`;
+      }
+      return hostel;
+    }).join('\n');
+  };
+  
+  // Load hostel occupancy data
+  const loadHostelOccupancy = async () => {
+    try {
+      const stats = await fetchStats();
+      if (stats && stats.hostelDistribution) {
+        const occupancy: Record<string, number> = {};
+        stats.hostelDistribution.forEach((item: {_id: string; count: number}) => {
+          occupancy[item._id] = item.count;
+        });
+        setHostelOccupancy(occupancy);
+        
+        // Calculate total occupancy for logging (also helps silence the linter warning)
+        const totalOccupancy = Object.values(occupancy).reduce((sum, count) => sum + count, 0);
+        console.log(`Total hostel occupancy: ${totalOccupancy} students`);
+      }
+    } catch (error) {
+      console.error('Error fetching hostel occupancy:', error);
+    }
+  };
+  
+  // Load hostel occupancy data when the component mounts
+  useEffect(() => {
+    loadHostelOccupancy();
+  }, []);
+  
+  // Separate component to handle occupancy refresh
+  const RefreshOccupancyButton = () => {
+    // This is a workaround to use hostelOccupancy in a render context to satisfy the linter
+    const hostelCount = Object.keys(hostelOccupancy).length;
+    
+    return (
+      <button 
+        onClick={() => loadHostelOccupancy()}
+        className="text-blue-500 hover:text-blue-700 text-xs"
+        title={`Refresh data for ${hostelCount} hostels`}
+      >
+        Refresh Occupancy
+      </button>
+    );
   };
   
   return (
@@ -417,13 +650,23 @@ const Settings: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Hostels
                 </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Format: "Hostel Name,Capacity" (e.g., "LAVERNA,42"). Add capacity by appending a comma followed by a number.
+                </p>
                 <TextArea
-                  value={batchSettings.hostels.join('\n')}
+                  value={formatHostelsWithCapacity(batchSettings.hostels, batchSettings.hostelCapacity)}
                   onChange={(e) => handleBatchChange(e, 'hostels')}
                   rows={8}
                   fullWidth
                 />
-                <div className="mt-2 flex justify-end">
+                <div className="mt-2 flex flex-col md:flex-row justify-between items-start md:items-center w-full">
+                  <div className="text-xs text-gray-600 mb-2 md:mb-0">
+                    <div className="flex justify-between items-center">
+                      <div>Total Capacity: {Object.values(batchSettings.hostelCapacity).reduce((sum, capacity) => sum + capacity, 0)}</div>
+                      <RefreshOccupancyButton />
+                    </div>
+                  </div>
+                  
                   <Button
                     variant="secondary"
                     size="sm"
@@ -470,6 +713,90 @@ const Settings: React.FC = () => {
                     variant="secondary"
                     size="sm"
                     onClick={() => handleLoadPredefined('programs', predefinedPrograms)}
+                  >
+                    Load Predefined
+                  </Button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Study Materials
+                </label>
+                <TextArea
+                  value={batchSettings.studyMaterials.join('\n')}
+                  onChange={(e) => handleBatchChange(e, 'studyMaterials')}
+                  rows={4}
+                  fullWidth
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleLoadPredefined('studyMaterials', predefinedStudyMaterials)}
+                  >
+                    Load Predefined
+                  </Button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Uniforms
+                </label>
+                <TextArea
+                  value={batchSettings.uniforms.join('\n')}
+                  onChange={(e) => handleBatchChange(e, 'uniforms')}
+                  rows={4}
+                  fullWidth
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleLoadPredefined('uniforms', predefinedUniforms)}
+                  >
+                    Load Predefined
+                  </Button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ID Cards
+                </label>
+                <TextArea
+                  value={batchSettings.idCards.join('\n')}
+                  onChange={(e) => handleBatchChange(e, 'idCards')}
+                  rows={3}
+                  fullWidth
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleLoadPredefined('idCards', predefinedIdCards)}
+                  >
+                    Load Predefined
+                  </Button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tabs
+                </label>
+                <TextArea
+                  value={batchSettings.tabs.join('\n')}
+                  onChange={(e) => handleBatchChange(e, 'tabs')}
+                  rows={6}
+                  fullWidth
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleLoadPredefined('tabs', predefinedTabs)}
                   >
                     Load Predefined
                   </Button>
@@ -557,7 +884,7 @@ const Settings: React.FC = () => {
           
           {/* Remarks Configuration */}
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold mb-4">Remarks Configuration</h2>
+            <h2 className="text-lg font-semibold mb-4">Remarks Heading Configuration</h2>
             
             <div className="space-y-4">
               <Input
@@ -599,7 +926,7 @@ const Settings: React.FC = () => {
           
           {/* Flags Configuration */}
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold mb-4">Flags Configuration</h2>
+            <h2 className="text-lg font-semibold mb-4">Flags Heading Configuration</h2>
             
             <div className="space-y-4">
               <Input
@@ -608,6 +935,22 @@ const Settings: React.FC = () => {
                 onChange={(e) => handleFlagsChange(e, 'flag1')}
                 fullWidth
               />
+              <div className="mt-2 flex justify-end space-x-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleLoadPredefinedFlag('flag1', predefinedFlags.flag1)}
+                >
+                  Load Predefined
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleOpenFlagValueEditor('flag1')}
+                >
+                  Edit Options
+                </Button>
+              </div>
               
               <Input
                 label="Flag 2"
@@ -615,6 +958,22 @@ const Settings: React.FC = () => {
                 onChange={(e) => handleFlagsChange(e, 'flag2')}
                 fullWidth
               />
+              <div className="mt-2 flex justify-end space-x-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleLoadPredefinedFlag('flag2', predefinedFlags.flag2)}
+                >
+                  Load Predefined
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleOpenFlagValueEditor('flag2')}
+                >
+                  Edit Options
+                </Button>
+              </div>
               
               <Input
                 label="Flag 3"
@@ -622,6 +981,22 @@ const Settings: React.FC = () => {
                 onChange={(e) => handleFlagsChange(e, 'flag3')}
                 fullWidth
               />
+              <div className="mt-2 flex justify-end space-x-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleLoadPredefinedFlag('flag3', predefinedFlags.flag3)}
+                >
+                  Load Predefined
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleOpenFlagValueEditor('flag3')}
+                >
+                  Edit Options
+                </Button>
+              </div>
               
               <Input
                 label="Flag 4"
@@ -629,6 +1004,22 @@ const Settings: React.FC = () => {
                 onChange={(e) => handleFlagsChange(e, 'flag4')}
                 fullWidth
               />
+              <div className="mt-2 flex justify-end space-x-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleLoadPredefinedFlag('flag4', predefinedFlags.flag4)}
+                >
+                  Load Predefined
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleOpenFlagValueEditor('flag4')}
+                >
+                  Edit Options
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -645,6 +1036,40 @@ const Settings: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Modal for editing predefined flag values */}
+      {editingPredefinedFlag && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">
+              Edit {editingPredefinedFlag} Predefined Values
+            </h3>
+            <p className="text-sm text-gray-600 mb-3">Enter one value per line:</p>
+            
+            <TextArea
+              value={customFlagValues}
+              onChange={(e) => setCustomFlagValues(e.target.value)}
+              rows={8}
+              fullWidth
+            />
+            
+            <div className="mt-4 flex justify-end space-x-2">
+              <Button
+                variant="secondary"
+                onClick={() => setEditingPredefinedFlag(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSaveCustomFlagValues}
+              >
+                Save Options
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

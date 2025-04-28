@@ -20,7 +20,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
   mode,
   onExistingStudent,
 }) => {
-  const { addStudent, updateStudent, batchConfig, remarksConfig, flagsConfig, fetchAllConfigs, findStudent } = useStudentStore();
+  const { addStudent, updateStudent, batchConfig, remarksConfig, flagsConfig, fetchAllConfigs, findStudent, allStudents } = useStudentStore();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
   
@@ -343,6 +343,30 @@ const StudentForm: React.FC<StudentFormProps> = ({
         if (id === 'hostel') options = batchConfig.hostels;
         if (id === 'stream') options = batchConfig.streams;
         if (id === 'program') options = batchConfig.programs;
+        if (id === 'studyMaterial') options = batchConfig.studyMaterials;
+        if (id === 'uniform') options = batchConfig.uniforms;
+        if (id === 'idCard') options = batchConfig.idCards;
+        if (id === 'tab') options = batchConfig.tabs;
+        
+        // For flags, if the value is empty, show an empty option first
+        if (id === 'flag1' || id === 'flag2' || id === 'flag3' || id === 'flag4') {
+          // Start with an empty option
+          options = [''];
+          
+          // Add any non-empty flags from all students
+          // Use a Set to ensure uniqueness
+          const flagsSet = new Set<string>();
+          
+          allStudents.forEach(student => {
+            const flagValue = student[id as keyof Student] as string;
+            if (flagValue) {
+              flagsSet.add(flagValue);
+            }
+          });
+          
+          // Convert Set to array and add to options
+          options = [...options, ...Array.from(flagsSet)];
+        }
         
         return (
           <Select

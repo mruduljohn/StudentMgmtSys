@@ -4,6 +4,7 @@ import Layout from '../components/layout/Layout';
 import Button from '../components/ui/Button';
 import { useStudentStore } from '../store/studentStore';
 import { useHourStore } from '../store/hourStore';
+import { useAuthStore } from '../store/authStore';
 import { studentsToExcel, downloadExcel, studentsToCSV, studentsToPDF, downloadCSV, downloadPDF, hoursToExcel, hoursToCSV, hoursToPDF, hourStatsToExcel, hourStatsToCSV, hourStatsToPDF } from '../utils/excelUtils';
 import * as XLSX from 'xlsx';
 import FileNamePrompt from '../components/ui/FileNamePrompt';
@@ -11,6 +12,8 @@ import FileNamePrompt from '../components/ui/FileNamePrompt';
 const ImportExport: React.FC = () => {
   const studentStore = useStudentStore();
   const hourStore = useHourStore();
+  const authStore = useAuthStore();
+  const isAdmin = authStore.user?.role === 'ADMIN';
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newStudentsFileInputRef = useRef<HTMLInputElement>(null);
   const updateStudentsFileInputRef = useRef<HTMLInputElement>(null);
@@ -129,6 +132,12 @@ const ImportExport: React.FC = () => {
         alert('Failed to export students data');
       }
     } else if (exportType === 'hours') {
+      // Security check - only allow admin to export hours data
+      if (!isAdmin) {
+        setUploadError('Only administrators can export hour data');
+        return;
+      }
+      
       // Check if hourStore has been initialized
       if (!hourStore.isDataLoaded) {
         hourStore.init();
@@ -162,6 +171,12 @@ const ImportExport: React.FC = () => {
         alert('Failed to export hours data');
       }
     } else if (exportType === 'hourStats') {
+      // Security check - only allow admin to export hour stats
+      if (!isAdmin) {
+        setUploadError('Only administrators can export hour statistics');
+        return;
+      }
+      
       // Check if hourStore has been initialized
       if (!hourStore.isDataLoaded) {
         hourStore.init();
@@ -547,8 +562,8 @@ const ImportExport: React.FC = () => {
               className="p-2 border rounded-md w-full mb-4"
             >
               <option value="students">Students Data</option>
-              <option value="hours">Hours Data</option>
-              <option value="hourStats">Hour Statistics</option>
+              {isAdmin && <option value="hours">Hours Data</option>}
+              {isAdmin && <option value="hourStats">Hour Statistics</option>}
             </select>
             
             <label htmlFor="export-format" className="text-gray-700 font-medium block mb-2">
@@ -592,7 +607,7 @@ const ImportExport: React.FC = () => {
                 )}
               </>
             )}
-            {exportType === 'hours' && (
+            {exportType === 'hours' && isAdmin && (
               <>
                 <p>Total hour records: {hourStore.getTotalHours}</p>
                 {hourStore.getTotalHours === 0 && (
@@ -602,7 +617,7 @@ const ImportExport: React.FC = () => {
                 )}
               </>
             )}
-            {exportType === 'hourStats' && (
+            {exportType === 'hourStats' && isAdmin && (
               <p>Export detailed statistics about hours and chapters across batches and subjects.</p>
             )}
           </div>
