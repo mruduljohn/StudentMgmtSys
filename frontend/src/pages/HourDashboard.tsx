@@ -77,6 +77,12 @@ const HourDashboard: React.FC = observer(() => {
       setCurrentDateTime(new Date());
     }, 1000);
     
+    // Inform users about the server-side searching
+    toast.success("Hour search now works across all fields with highlighted matches", {
+      duration: 5000,
+      id: "server-side-search-notification",
+    });
+    
     // Clean up interval on unmount
     return () => {
       clearInterval(timeInterval);
@@ -155,9 +161,17 @@ const HourDashboard: React.FC = observer(() => {
     
     // Update search in store
     if (tabValue === 0) {
-      // Immediate update for better user experience
-      hourStore.setFilter('chapter', query);
-      // Fetch with new filters
+      // Reset to first page when searching
+      hourStore.setPage(1);
+      
+      // Use the general search parameter instead of specific chapter filter
+      if (query.trim() === '') {
+        hourStore.setSearchQuery('');
+      } else {
+        hourStore.setSearchQuery(query);
+      }
+      
+      // Trigger API call to fetch with the new search parameters
       hourStore.fetchHours();
     }
   };

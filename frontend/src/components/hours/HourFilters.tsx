@@ -116,30 +116,35 @@ const HourFilters: React.FC<HourFiltersProps> = ({
 
   // Render search status indicator
   const renderSearchStatus = () => {
-    switch (searchStatus) {
-      case 'searching':
-        return (
-          <div className="absolute inset-y-0 right-10 flex items-center pr-2">
-            <Loader className="h-4 w-4 text-blue-500 animate-spin" />
-          </div>
-        );
-      case 'completed':
-        return (
-          <div className="absolute inset-y-0 right-10 flex items-center pr-2">
-            <Check className="h-4 w-4 text-green-500" />
-            <span className="text-xs text-green-500 ml-1">{totalResults} found</span>
-          </div>
-        );
-      case 'no-results':
-        return (
-          <div className="absolute inset-y-0 right-10 flex items-center pr-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <span className="text-xs text-amber-500 ml-1">No results</span>
-          </div>
-        );
-      default:
-        return null;
+    // Don't show any status if there's no search query
+    if (!internalSearchQuery || internalSearchQuery.trim() === '') {
+      return null;
     }
+    
+    if (loading) {
+      return (
+        <div className="absolute inset-y-0 right-10 flex items-center pr-2">
+          <Loader className="h-4 w-4 text-blue-500 animate-spin" />
+          <span className="text-xs text-blue-500 ml-1">Searching...</span>
+        </div>
+      );
+    }
+    
+    if (totalResults === 0) {
+      return (
+        <div className="absolute inset-y-0 right-10 flex items-center pr-2">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <span className="text-xs text-amber-500 ml-1">No matches found</span>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="absolute inset-y-0 right-10 flex items-center pr-2">
+        <Check className="h-4 w-4 text-green-500" />
+        <span className="text-xs text-green-500 ml-1">{totalResults} in database</span>
+      </div>
+    );
   };
 
   return (
@@ -185,7 +190,7 @@ const HourFilters: React.FC<HourFiltersProps> = ({
         
         <div>
           <label htmlFor="chapter-search" className="block text-sm font-medium text-gray-700 mb-1">
-            Chapter Search
+            Search
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -194,7 +199,7 @@ const HourFilters: React.FC<HourFiltersProps> = ({
             <input
               id="chapter-search"
               type="text"
-              placeholder="Search chapters..."
+              placeholder="Search across all fields..."
               value={internalSearchQuery}
               onChange={handleChapterSearch}
               className="pl-10 px-3 py-2 bg-white border shadow-sm border-gray-300 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-blue-500 block w-full rounded-md sm:text-sm focus:ring-1"

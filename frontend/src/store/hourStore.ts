@@ -128,6 +128,9 @@ class HourStore {
     this.filters.clear();
     this.searchQuery.set('');
     this.currentPage.set(1); // Reset to first page when clearing filters
+    
+    // Fetch hours with cleared filters
+    this.fetchHours();
   });
   
   setPage = action((page: number) => {
@@ -149,12 +152,14 @@ class HourStore {
     this.loading.set(true);
     
     try {
-      // Request a larger page size to handle client-side sorting
-      // This is a workaround for the API not sorting correctly
+      // When searching, we want all results without pagination constraints
+      const isSearching = this.searchQuery.get() || this.filters.has('chapter');
+      
+      // Create API parameters for server-side processing
       const params: ApiParams = {
-        page: 1, // Request first page with larger size
-        limit: 1000, // Request more data to sort client-side
-        // Still send sort parameters in case API gets fixed
+        // If we're searching, don't limit by page size to get all matches
+        page: isSearching ? undefined : this.currentPage.get(),
+        limit: isSearching ? undefined : this.pageSize.get(),
         sortBy: this.sortField.get(),
         sortOrder: this.sortOrder.get(),
         search: this.searchQuery.get() || undefined
@@ -167,66 +172,46 @@ class HourStore {
       
       console.log('Fetching hours with params:', params);
       
-      // Store the API response outside of any MobX actions
+      // Make API request with all parameters for server-side processing
       const response = await fetchHours(params);
-      
-      // Apply client-side sorting and pagination
-      const sortedHours = this.applySorting(response.hours);
-      const currentPage = this.currentPage.get();
-      const pageSize = this.pageSize.get();
-      
-      // Client-side pagination
-      const startIndex = (currentPage - 1) * pageSize;
-      const endIndex = startIndex + pageSize;
-      const paginatedHours = sortedHours.slice(startIndex, endIndex);
-      
-      // Calculate total pages based on the sorted data
-      const totalPages = Math.ceil(sortedHours.length / pageSize);
       
       // Use runInAction to batch all observable mutations
       runInAction(() => {
-        this.hours.replace(paginatedHours);
-        this.totalHours.set(sortedHours.length);
-        this.totalPages.set(totalPages);
-        this.loading.set(false); // Move this inside runInAction to ensure atomic updates
+        this.hours.replace(response.hours);
+        this.totalHours.set(response.total);
+        
+        // If we're searching, we have all results and need to handle pagination client-side
+        if (isSearching) {
+          const totalPages = Math.ceil(response.total / this.pageSize.get());
+          this.totalPages.set(totalPages);
+          
+          // Apply client-side pagination if we're searching
+          if (response.total > 0) {
+            const startIndex = (this.currentPage.get() - 1) * this.pageSize.get();
+            const endIndex = startIndex + this.pageSize.get();
+            const paginatedHours = response.hours.slice(startIndex, endIndex);
+            this.hours.replace(paginatedHours);
+          }
+        } else {
+          // For normal queries, use server pagination
+          this.totalPages.set(Math.ceil(response.total / this.pageSize.get()));
+        }
+        
+        this.loading.set(false);
       });
     } catch (error) {
-      // Handle errors within runInAction as well
+      // Handle errors within runInAction
       runInAction(() => {
         console.error("Error fetching hours:", error);
         this.error.set("Failed to fetch hours");
-        this.loading.set(false); // Make sure loading is set to false in case of error
+        this.loading.set(false);
       });
     }
   });
   
-  // Helper method to apply client-side sorting based on current sort settings
+  // Remove the client-side sorting function since we'll use server-side sorting
   applySorting = (hours: Hour[]): Hour[] => {
-    const field = this.sortField.get();
-    const order = this.sortOrder.get();
-    
-    console.log(`Applying client-side sorting: ${field} ${order}`);
-    
-    return [...hours].sort((a, b) => {
-      // Handle different field types appropriately
-      let valueA = a[field as keyof Hour];
-      let valueB = b[field as keyof Hour];
-      
-      // Handle undefined or null values
-      if (valueA === undefined || valueA === null) valueA = '';
-      if (valueB === undefined || valueB === null) valueB = '';
-      
-      // Convert to strings for comparison if they're not numbers
-      if (typeof valueA !== 'number') valueA = String(valueA).toLowerCase();
-      if (typeof valueB !== 'number') valueB = String(valueB).toLowerCase();
-      
-      // Apply the sort order
-      if (order === 'asc') {
-        return valueA < valueB ? -1 : valueA > valueB ? 1 : 0;
-      } else {
-        return valueA > valueB ? -1 : valueA < valueB ? 1 : 0;
-      }
-    });
+    return hours; // No client-side sorting needed anymore
   };
   
   fetchHourById = action(async (id: string) => {

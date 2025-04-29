@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
-import { Edit, Trash2, Plus, ArrowUp, ArrowDown, Download, AlertTriangle, Upload, FileText, CheckSquare, Square } from 'lucide-react';
+import { Edit, Trash2, Plus, ArrowUp, ArrowDown, Download, Upload, FileText, CheckSquare, Square } from 'lucide-react';
 import { useHourStore } from '../../store/hourStore';
 import { useAuthStore } from '../../store/authStore';
 import { Hour } from '../../types';
@@ -28,7 +28,6 @@ const HourList: React.FC = observer(() => {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isFileNamePromptOpen, setIsFileNamePromptOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | 'pdf'>('xlsx');
-  const [showSortingNotice, setShowSortingNotice] = useState(true);
   const [selectedHours, setSelectedHours] = useState<string[]>([]);
   const [showBulkMenu, setShowBulkMenu] = useState(false);
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
@@ -36,17 +35,6 @@ const HourList: React.FC = observer(() => {
   const [uploadMode, setUploadMode] = useState<'new' | 'update' | 'both'>('both');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Show sorting notice only once per session
-  useEffect(() => {
-    if (showSortingNotice) {
-      toast.success(
-        "Sorting is being handled client-side temporarily. Backend sorting fix is in progress.",
-        { duration: 5000, icon: <AlertTriangle className="text-orange-500" /> }
-      );
-      setShowSortingNotice(false);
-    }
-  }, [showSortingNotice]);
 
   const handleChangePage = async (newPage: number) => {
     try {
@@ -141,25 +129,43 @@ const HourList: React.FC = observer(() => {
   };
   
   // Function to highlight search matches in text
-  const highlightSearchMatch = (text: string) => {
-    const chapterFilter = hourStore.filters.get('chapter') as string;
-    
-    if (!chapterFilter || typeof chapterFilter !== 'string' || chapterFilter.trim() === '') {
-      return <span>{text}</span>;
+  const highlightSearchMatch = (text: string | number | undefined | null) => {
+    // Handle undefined, null, or empty values
+    if (text === undefined || text === null) {
+      return <span>-</span>;
     }
     
-    const regex = new RegExp(`(${chapterFilter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    const parts = text.split(regex);
+    // Convert to string for consistency
+    const stringValue = String(text);
+    if (stringValue.trim() === '') {
+      return <span>-</span>;
+    }
     
-    return (
-      <>
-        {parts.map((part, i) => 
-          regex.test(part) ? 
-            <span key={i} className="bg-yellow-200 font-medium">{part}</span> : 
-            <span key={i}>{part}</span>
-        )}
-      </>
-    );
+    const searchQuery = hourStore.searchQuery.get();
+    
+    if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
+      return <span>{stringValue}</span>;
+    }
+    
+    // The server has already filtered matching results, but we still want to highlight matches
+    try {
+      const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+      const parts = stringValue.split(regex);
+      
+      return (
+        <>
+          {parts.map((part, i) => 
+            regex.test(part) ? 
+              <span key={i} className="bg-yellow-200 font-medium">{part}</span> : 
+              <span key={i}>{part}</span>
+          )}
+        </>
+      );
+    } catch (error) {
+      // Fallback in case of regex errors
+      console.error('Error in highlightSearchMatch:', error);
+      return <span>{stringValue}</span>;
+    }
   };
 
   // Handle row selection
@@ -621,10 +627,10 @@ const HourList: React.FC = observer(() => {
                     {formatDate(hour.examDate)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.batch}
+                    {highlightSearchMatch(hour.batch)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.subject}
+                    {highlightSearchMatch(hour.subject)}
                   </td>
                   <td className="sticky left-0 z-10 px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-white">
                     <div className="max-w-[250px] overflow-hidden text-ellipsis">
@@ -632,10 +638,10 @@ const HourList: React.FC = observer(() => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.mode}
+                    {highlightSearchMatch(hour.mode)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.classTeacher}
+                    {highlightSearchMatch(hour.classTeacher)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {hour.faculties && hour.faculties.length > 0 ? (
@@ -644,10 +650,10 @@ const HourList: React.FC = observer(() => {
                           <div key={index} className="mb-1">
                             {faculty.code && faculty.name ? (
                               <>
-                                <span className="font-semibold">{faculty.code}</span>: {faculty.name}
+                                <span className="font-semibold">{highlightSearchMatch(faculty.code)}</span>: {highlightSearchMatch(faculty.name)}
                               </>
                             ) : (
-                              faculty.code || faculty.name || ''
+                              highlightSearchMatch(faculty.code || faculty.name || '')
                             )}
                           </div>
                         ))}
@@ -661,14 +667,14 @@ const HourList: React.FC = observer(() => {
                               <>
                                 {hour.faculty1.code && hour.faculty1.name ? (
                                   <>
-                                    <span className="font-semibold">{hour.faculty1.code}</span>: {hour.faculty1.name}
+                                    <span className="font-semibold">{highlightSearchMatch(hour.faculty1.code)}</span>: {highlightSearchMatch(hour.faculty1.name)}
                                   </>
                                 ) : (
-                                  hour.faculty1.code || hour.faculty1.name || ''
+                                  highlightSearchMatch(hour.faculty1.code || hour.faculty1.name || '')
                                 )}
                               </>
                             ) : (
-                              String(hour.faculty1)
+                              highlightSearchMatch(String(hour.faculty1))
                             )}
                           </div>
                         )}
@@ -678,14 +684,14 @@ const HourList: React.FC = observer(() => {
                               <>
                                 {hour.faculty2.code && hour.faculty2.name ? (
                                   <>
-                                    <span className="font-semibold">{hour.faculty2.code}</span>: {hour.faculty2.name}
+                                    <span className="font-semibold">{highlightSearchMatch(hour.faculty2.code)}</span>: {highlightSearchMatch(hour.faculty2.name)}
                                   </>
                                 ) : (
-                                  hour.faculty2.code || hour.faculty2.name || ''
+                                  highlightSearchMatch(hour.faculty2.code || hour.faculty2.name || '')
                                 )}
                               </>
                             ) : (
-                              String(hour.faculty2)
+                              highlightSearchMatch(String(hour.faculty2))
                             )}
                           </div>
                         )}
@@ -695,14 +701,14 @@ const HourList: React.FC = observer(() => {
                               <>
                                 {hour.faculty3.code && hour.faculty3.name ? (
                                   <>
-                                    <span className="font-semibold">{hour.faculty3.code}</span>: {hour.faculty3.name}
+                                    <span className="font-semibold">{highlightSearchMatch(hour.faculty3.code)}</span>: {highlightSearchMatch(hour.faculty3.name)}
                                   </>
                                 ) : (
-                                  hour.faculty3.code || hour.faculty3.name || ''
+                                  highlightSearchMatch(hour.faculty3.code || hour.faculty3.name || '')
                                 )}
                               </>
                             ) : (
-                              String(hour.faculty3)
+                              highlightSearchMatch(String(hour.faculty3))
                             )}
                           </div>
                         )}
@@ -720,35 +726,35 @@ const HourList: React.FC = observer(() => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`px-2 py-1 text-xs rounded-full ${getChapterStatusColor(hour.chapterStatus)}`}>
-                      {hour.chapterStatus === 'NOT STARTED' ? 'NOT STARTED' : hour.chapterStatus}
+                      {highlightSearchMatch(hour.chapterStatus === 'NOT STARTED' ? 'NOT STARTED' : hour.chapterStatus)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.averageMarksOfBatch || '-'}
+                    {hour.averageMarksOfBatch ? highlightSearchMatch(String(hour.averageMarksOfBatch)) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.numberOfAPlus || '-'}
+                    {hour.numberOfAPlus ? highlightSearchMatch(String(hour.numberOfAPlus)) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.year || '-'}
+                    {hour.year ? highlightSearchMatch(String(hour.year)) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.remarks1 || '-'}
+                    {hour.remarks1 ? highlightSearchMatch(String(hour.remarks1)) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.remarks2 || '-'}
+                    {hour.remarks2 ? highlightSearchMatch(String(hour.remarks2)) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.remarks3 || '-'}
+                    {hour.remarks3 ? highlightSearchMatch(String(hour.remarks3)) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.flag1 || '-'}
+                    {hour.flag1 ? highlightSearchMatch(String(hour.flag1)) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.flag2 || '-'}
+                    {hour.flag2 ? highlightSearchMatch(String(hour.flag2)) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {hour.flag3 || '-'}
+                    {hour.flag3 ? highlightSearchMatch(String(hour.flag3)) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <button 
@@ -787,8 +793,9 @@ const HourList: React.FC = observer(() => {
         </div>
         <div className="flex items-center">
           <span className="mr-4 text-sm text-gray-700">
-            {hourStore.getCurrentPage * hourStore.getPageSize - hourStore.getPageSize + 1}-
-            {Math.min(hourStore.getCurrentPage * hourStore.getPageSize, hourStore.getTotalHours)} of {hourStore.getTotalHours}
+            {hourStore.getTotalHours === 0 ? '0-0' : 
+              `${hourStore.getCurrentPage * hourStore.getPageSize - hourStore.getPageSize + 1}-
+              ${Math.min(hourStore.getCurrentPage * hourStore.getPageSize, hourStore.getTotalHours)}`} of {hourStore.getTotalHours}
           </span>
           <div className="flex">
             <button
