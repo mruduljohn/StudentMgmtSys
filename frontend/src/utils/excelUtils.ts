@@ -390,7 +390,7 @@ export const hoursToExcel = (hours: any[]): ArrayBuffer => {
       'Class Teacher': hour.classTeacher,
       'Faculty Code': facultyCodes,
       'Faculty Name': facultyNames,
-      'Status': hour.chapterStatus,
+      'Status': hour.chapterStatus, // Auto-calculated based on completed and allotted hours
       'Exam Date': hour.date,
       'Alloted Hours': hour.allotedHours,
       'Completed Hours': hour.completedHours,
@@ -677,7 +677,7 @@ export const hoursToTransposedExcel = (hours: any[]): ArrayBuffer => {
       'Class Teacher': hour.classTeacher,
       'Faculty Code': facultyCodes,
       'Faculty Name': facultyNames,
-      'Status': hour.chapterStatus,
+      'Status': hour.chapterStatus, // Auto-calculated based on completed and allotted hours
       'Exam Date': hour.date,
       'Alloted Hours': hour.allotedHours,
       'Completed Hours': hour.completedHours,

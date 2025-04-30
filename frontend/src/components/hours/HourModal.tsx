@@ -160,21 +160,64 @@ const HourModal: React.FC<HourModalProps> = ({
   
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    
+    // Handle empty value or backspace (which can result in empty string)
+    if (value === '') {
+      setFormData(prev => ({ ...prev, [name]: 0 }));
+      return;
+    }
+    
     const numValue = parseFloat(value);
     
     if (!isNaN(numValue) && numValue >= 0) {
+      // Check if completedHours is greater than allotedHours
+      if (name === 'completedHours') {
+        const allotedHours = formData.allotedHours || 0;
+        if (numValue > allotedHours) {
+          setErrors(prev => ({ 
+            ...prev, 
+            completedHours: 'Completed hours cannot exceed allotted hours. Please increase allotted hours first.' 
+          }));
+          return;
+        }
+      }
+      
       setFormData(prev => ({ ...prev, [name]: numValue }));
       
-      // Calculate remaining hours needed
+      // Calculate remaining hours needed and automatically set chapter status
       if (name === 'allotedHours' || name === 'completedHours') {
         const allotedHours = name === 'allotedHours' ? numValue : (formData.allotedHours || 0);
         const completedHours = name === 'completedHours' ? numValue : (formData.completedHours || 0);
+        
+        // If allotedHours changed and it's now less than completedHours, adjust completedHours
+        if (name === 'allotedHours' && completedHours > numValue) {
+          setFormData(prev => ({ 
+            ...prev, 
+            [name]: numValue,
+            completedHours: numValue,
+            remainingHoursNeeded: 0,
+            chapterStatus: 'COMPLETED'
+          }));
+          return;
+        }
+        
         const remainingHoursNeeded = Math.max(0, allotedHours - completedHours);
+        
+        // Automatically determine chapter status based on hours
+        let chapterStatus = 'NOT STARTED';
+        if (completedHours > 0) {
+          if (completedHours >= allotedHours) {
+            chapterStatus = 'COMPLETED';
+          } else {
+            chapterStatus = 'ONGOING';
+          }
+        }
         
         setFormData(prev => ({ 
           ...prev, 
           [name]: numValue,
-          remainingHoursNeeded
+          remainingHoursNeeded,
+          chapterStatus
         }));
       } else {
         setFormData(prev => ({ ...prev, [name]: numValue }));
@@ -250,9 +293,12 @@ const HourModal: React.FC<HourModalProps> = ({
       newErrors.completedHours = 'Completed hours must be greater than or equal to 0';
     }
     
-    if (!formData.chapterStatus) {
-      newErrors.chapterStatus = 'Chapter status is required';
+    // Check if completed hours exceed allotted hours
+    if (formData.completedHours > formData.allotedHours) {
+      newErrors.completedHours = 'Completed hours cannot exceed allotted hours';
     }
+    
+    // Chapter status is now automatically calculated, no need to validate
     
     // Only validate classTeacher for admin users
     // For mentors, we'll set it automatically
@@ -445,6 +491,8 @@ const HourModal: React.FC<HourModalProps> = ({
           options={['NOT STARTED', 'ONGOING', 'COMPLETED']}
           error={errors.chapterStatus}
           fullWidth
+          disabled={true}
+          helpText="Status is automatically calculated based on Completed Hours"
         />
         
         {/* Fields editable by both admin and mentors */}

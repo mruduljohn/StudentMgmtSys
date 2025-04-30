@@ -180,6 +180,18 @@ export const addHour = async (req: Request, res: Response): Promise<void> => {
     // Calculate remaining hours
     if (hourData.allotedHours && hourData.completedHours) {
       hourData.remainingHoursNeeded = Math.max(0, hourData.allotedHours - hourData.completedHours);
+      
+      // Automatically determine chapter status based on hours
+      const allotedHours = parseFloat(hourData.allotedHours);
+      const completedHours = parseFloat(hourData.completedHours);
+      
+      if (completedHours === 0) {
+        hourData.chapterStatus = 'NOT STARTED';
+      } else if (completedHours >= allotedHours) {
+        hourData.chapterStatus = 'COMPLETED';
+      } else {
+        hourData.chapterStatus = 'ONGOING';
+      }
     }
     
     // Handle faculty data - convert from old format if needed
@@ -364,6 +376,15 @@ export const updateHour = async (req: Request, res: Response): Promise<void> => 
       const allotedHours = updateData.allotedHours !== undefined ? updateData.allotedHours : hour.allotedHours;
       const completedHours = updateData.completedHours !== undefined ? updateData.completedHours : hour.completedHours;
       updateData.remainingHoursNeeded = Math.max(0, allotedHours - completedHours);
+      
+      // Automatically determine chapter status based on hours
+      if (completedHours === 0) {
+        updateData.chapterStatus = 'NOT STARTED';
+      } else if (completedHours >= allotedHours) {
+        updateData.chapterStatus = 'COMPLETED';
+      } else {
+        updateData.chapterStatus = 'ONGOING';
+      }
     }
     
     // Handle exam date specifically to avoid common date parsing issues
@@ -1232,7 +1253,6 @@ export const uploadHoursCSV = async (req: Request, res: Response): Promise<void>
       else if (headerLower === 'alloted hours' || headerLower === 'allotedhours') headerMapping[index] = 'allotedHours';
       else if (headerLower === 'completed hours' || headerLower === 'completedhours') headerMapping[index] = 'completedHours';
       else if (headerLower === 'remaining hours' || headerLower === 'remaininghours' || headerLower === 'remaining hours needed') headerMapping[index] = 'remainingHours';
-      else if (headerLower === 'chapter status' || headerLower === 'chapterstatus') headerMapping[index] = 'chapterStatus';
       else if (headerLower === 'exam date' || headerLower === 'examdate') headerMapping[index] = 'examDate';
       // Faculty code and name mappings
       else if (headerLower === 'faculty1 code' || headerLower === 'faculty1code') headerMapping[index] = 'faculty1Code';
@@ -1297,7 +1317,7 @@ export const uploadHoursCSV = async (req: Request, res: Response): Promise<void>
           const cleanCell = cell.replace(/^"(.*)"$/, '$1').trim();
           
           const mappedField = headerMapping[index];
-          if (mappedField && cleanCell !== '') {
+          if (mappedField && cleanCell !== '' && mappedField !== 'chapterStatus') {  // Explicitly skip chapterStatus field
             hourData[mappedField] = cleanCell;
             
             // Extra logging for exam date field
@@ -1328,6 +1348,20 @@ export const uploadHoursCSV = async (req: Request, res: Response): Promise<void>
         
         // Save original exam date string for later processing
         const originalExamDateString = hourData.examDate;
+        
+        // Parse numeric values
+        const allotedHours = parseFloat(hourData.allotedHours) || 0;
+        const completedHours = parseFloat(hourData.completedHours) || 0;
+        
+        // Automatically determine chapter status based on hours
+        let chapterStatus = 'NOT STARTED';
+        if (completedHours > 0) {
+          if (completedHours >= allotedHours) {
+            chapterStatus = 'COMPLETED';
+          } else {
+            chapterStatus = 'ONGOING';
+          }
+        }
         
         // Create hour entry
         const hourEntry: {
@@ -1360,10 +1394,10 @@ export const uploadHoursCSV = async (req: Request, res: Response): Promise<void>
           chapter: chapter || '',
           mode: classMode || 'OFFLINE',
           classTeacher: classTeacher || '',
-          allotedHours: parseFloat(hourData.allotedHours) || 0,
-          completedHours: parseFloat(hourData.completedHours) || 0,
-          remainingHours: parseFloat(hourData.remainingHours) || 0,
-          chapterStatus: mapChapterStatus(hourData.chapterStatus),
+          allotedHours: allotedHours,
+          completedHours: completedHours,
+          remainingHours: Math.max(0, allotedHours - completedHours),
+          chapterStatus: chapterStatus, // Use the automatically determined status
           createdBy: req.user?.id || '',
           updatedBy: req.user?.id || ''
         };

@@ -23,7 +23,6 @@ const SampleHourCSV: React.FC = () => {
       'ALLOTED HOURS',
       'COMPLETED HOURS',
       'REMAINING HOURS NEEDED',
-      'CHAPTER STATUS',
       'AVERAGE MARK OF BATCH',
       'NUMBER OF A+',
       'REMARKS1',
@@ -53,7 +52,6 @@ const SampleHourCSV: React.FC = () => {
         '12',
         '11',
         '1',
-        'COMPLETED',
         '',
         '',
         '',
@@ -81,7 +79,6 @@ const SampleHourCSV: React.FC = () => {
         '8',
         '6',
         '2',
-        'ONGOING',
         '85',
         '12',
         '',
@@ -109,7 +106,6 @@ const SampleHourCSV: React.FC = () => {
         '10',
         '0',
         '10',
-        'NOT STARTED',
         '',
         '',
         '',
@@ -161,6 +157,7 @@ const SampleHourCSV: React.FC = () => {
       <p className="text-xs text-gray-500 mt-1">
         Note: CSV must include EXAM DATE column (not just DATE). Date format should be DD-MM-YYYY.
         Both faculty code and name fields are included for better data organization.
+        The STATUS field is automatically calculated based on the COMPLETED HOURS and ALLOTED HOURS values.
       </p>
     </div>
   );
