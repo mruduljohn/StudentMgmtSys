@@ -13,7 +13,7 @@ import {
   hoursToTransposedExcel, hoursToTransposedCSV, hoursToTransposedPDF
 } from '../../utils/excelUtils';
 import FileNamePrompt from '../ui/FileNamePrompt';
-import toast from 'react-hot-toast';
+import { notifyCrudOperation, showErrorToast, showSuccessToast } from '../../utils/toastUtils';
 import Menu from '../ui/Menu';
 import SampleHourCSV from './SampleHourCSV';
 
@@ -44,7 +44,7 @@ const HourList: React.FC = observer(() => {
       setSelectedHours([]);
     } catch (error) {
       console.error('Error changing page:', error);
-      toast.error('An error occurred while changing page');
+      showErrorToast('An error occurred while changing page');
     }
   };
 
@@ -57,7 +57,7 @@ const HourList: React.FC = observer(() => {
       setSelectedHours([]);
     } catch (error) {
       console.error('Error changing rows per page:', error);
-      toast.error('An error occurred while changing rows per page');
+      showErrorToast('An error occurred while changing rows per page');
     }
   };
 
@@ -70,7 +70,7 @@ const HourList: React.FC = observer(() => {
       setSelectedHours([]);
     } catch (error) {
       console.error('Error sorting hours:', error);
-      toast.error('An error occurred while sorting');
+      showErrorToast('An error occurred while sorting');
     }
   };
 
@@ -194,12 +194,12 @@ const HourList: React.FC = observer(() => {
       for (const hourId of selectedHours) {
         await hourStore.deleteHour(hourId);
       }
-      toast.success(`Successfully deleted ${selectedHours.length} hours`);
+      showSuccessToast(`Successfully deleted ${selectedHours.length} hours`);
       setSelectedHours([]);
       setIsBulkDeleteDialogOpen(false);
     } catch (error) {
       console.error('Error deleting hours:', error);
-      toast.error('An error occurred while deleting hours');
+      showErrorToast('An error occurred while deleting hours');
     }
   };
 
@@ -224,7 +224,7 @@ const HourList: React.FC = observer(() => {
         : hourStore.getHours;
 
       if (hours.length === 0) {
-        toast.error('No hours data to export');
+        showErrorToast('No hours data to export');
         return;
       }
       
@@ -243,10 +243,10 @@ const HourList: React.FC = observer(() => {
           break;
       }
       
-      toast.success(`Successfully exported ${hours.length} hour records`);
+      showSuccessToast(`Successfully exported ${hours.length} hour records`);
     } catch (err) {
       console.error('Error exporting data:', err);
-      toast.error('Failed to export data');
+      showErrorToast('Failed to export data');
     }
   };
 
@@ -264,20 +264,20 @@ const HourList: React.FC = observer(() => {
 
   const handleUploadCSV = async () => {
     if (!csvFile) {
-      toast.error('Please select a CSV file');
+      showErrorToast('Please select a CSV file');
       return;
     }
 
     try {
       await hourStore.uploadHoursCSV(csvFile, uploadMode);
-      toast.success('CSV file uploaded successfully');
+      showSuccessToast('CSV file uploaded successfully');
       setCsvFile(null);
       setIsUploadModalOpen(false);
       // Refresh hours data
       await hourStore.fetchHours();
     } catch (error) {
       console.error('Error uploading CSV:', error);
-      toast.error('Failed to upload CSV file');
+      showErrorToast('Failed to upload CSV file');
     }
   };
 
@@ -295,7 +295,7 @@ const HourList: React.FC = observer(() => {
       const unselectedHours = hourStore.getHours.filter(h => !selectedHours.includes(h._id as string));
 
       if (unselectedHours.length === 0) {
-        toast.error('No unselected hours to export');
+        showErrorToast('No unselected hours to export');
         return;
       }
       
@@ -318,10 +318,10 @@ const HourList: React.FC = observer(() => {
           break;
       }
       
-      toast.success(`Successfully exported ${unselectedHours.length} unselected hour records`);
+      showSuccessToast(`Successfully exported ${unselectedHours.length} unselected hour records`);
     } catch (err) {
       console.error('Error exporting unselected data:', err);
-      toast.error('Failed to export unselected data');
+      showErrorToast('Failed to export unselected data');
     }
   };
 
@@ -376,19 +376,20 @@ const HourList: React.FC = observer(() => {
                       label: 'Invert Selection', 
                       onClick: handleInvertSelection 
                     },
+                    // Export options for all users (not just admin)
+                    { 
+                      label: 'Export Selected to Excel', 
+                      onClick: () => handleExportSelected('xlsx') 
+                    },
+                    { 
+                      label: 'Export Selected to CSV', 
+                      onClick: () => handleExportSelected('csv') 
+                    },
+                    { 
+                      label: 'Export Selected to PDF', 
+                      onClick: () => handleExportSelected('pdf') 
+                    },
                     ...(isAdmin ? [
-                      { 
-                        label: 'Export Selected to Excel', 
-                        onClick: () => handleExportSelected('xlsx') 
-                      },
-                      { 
-                        label: 'Export Selected to CSV', 
-                        onClick: () => handleExportSelected('csv') 
-                      },
-                      { 
-                        label: 'Export Selected to PDF', 
-                        onClick: () => handleExportSelected('pdf') 
-                      },
                       { 
                         label: 'Export Unselected to Excel',
                         onClick: () => {
@@ -633,8 +634,20 @@ const HourList: React.FC = observer(() => {
                     {highlightSearchMatch(hour.subject)}
                   </td>
                   <td className="sticky left-0 z-10 px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-white">
-                    <div className="max-w-[250px] overflow-hidden text-ellipsis">
-                      {highlightSearchMatch(hour.chapter)}
+                    <div className="max-w-[250px] overflow-hidden text-ellipsis flex items-center">
+                      <div 
+                        className="cursor-pointer hover:text-blue-500 flex-grow"
+                        onClick={() => handleEditClick(hour)}
+                      >
+                        {highlightSearchMatch(hour.chapter)}
+                      </div>
+                      <button 
+                        onClick={() => handleEditClick(hour)}
+                        className="text-blue-600 hover:text-blue-900 ml-2"
+                        title="Edit hour"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -758,14 +771,9 @@ const HourList: React.FC = observer(() => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <button 
-                      onClick={() => handleEditClick(hour)}
-                      className="text-blue-600 hover:text-blue-900 mr-2"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button 
                       onClick={() => handleDeleteClick(hour)}
                       className="text-red-600 hover:text-red-900"
+                      title="Delete hour"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

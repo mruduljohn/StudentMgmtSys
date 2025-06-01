@@ -6,6 +6,8 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import { getFieldConfigs } from '../../utils/fieldConfig';
+import { notifyCrudOperation, showErrorToast, showSuccessToast } from '../../utils/toastUtils';
+import toast from 'react-hot-toast';
 
 interface StudentFormProps {
   student?: Student;
@@ -142,9 +144,9 @@ const StudentForm: React.FC<StudentFormProps> = ({
     if (!formData.name) newErrors.name = 'Name is required';
     if (!formData.studentId) newErrors.studentId = 'Student ID is required';
     
-    // Phone number validation
-    if (formData.phoneNumber && !/^\d{10,15}$/.test(formData.phoneNumber)) {
-      newErrors.phoneNumber = 'Enter a valid phone number';
+    // Phone number validation - accept international formats up to 15 digits
+    if (formData.phoneNumber && !/^\+?\d{1,15}$/.test(formData.phoneNumber)) {
+      newErrors.phoneNumber = 'Enter a valid phone number (up to 15 digits, can include + prefix)';
     }
     
     // Custom field validations
@@ -171,9 +173,9 @@ const StudentForm: React.FC<StudentFormProps> = ({
       return value;
     }
     
-    // Map hostel values
+    // Map hostel values - handle case variations
     if (field === 'hostel') {
-      if (value === 'DAY SCHOLAR') return 'DS';
+      if (value === 'DAY SCHOLAR' || value.toUpperCase() === 'DAY SCHOLAR') return 'DS';
       return value;
     }
     
@@ -241,16 +243,33 @@ const StudentForm: React.FC<StudentFormProps> = ({
           }
         }
         
+        // Show loading notification
+        const loadingToast = notifyCrudOperation('create', 'Student', 'loading');
+        
         // If we get here, the student ID doesn't exist yet, so proceed with adding
         await addStudent(submissionData);
+        
+        // Dismiss loading notification and show success
+        toast.dismiss(loadingToast);
+        notifyCrudOperation('create', 'Student', 'success');
+        
         setSuccessMessage('Student added successfully!');
         
         // Wait for 1.5 seconds to show the success message, then close the form
         setTimeout(() => {
           onClose();
         }, 1500);
-      } else if (mode === 'edit' && student) {
-        await updateStudent(student.studentId, submissionData);
+      } else if (mode === 'edit' && student?._id) {
+        // Show loading notification
+        const loadingToast = notifyCrudOperation('update', 'Student', 'loading');
+        
+        // Update existing student
+        await updateStudent(student._id, submissionData);
+        
+        // Dismiss loading and show success
+        toast.dismiss(loadingToast);
+        notifyCrudOperation('update', 'Student', 'success');
+        
         setSuccessMessage('Student updated successfully!');
         
         // Wait for 1.5 seconds to show the success message, then close the form
@@ -259,38 +278,16 @@ const StudentForm: React.FC<StudentFormProps> = ({
         }, 1500);
       }
     } catch (error: unknown) {
-      console.error('Error submitting student:', error);
+      const err = error as { message?: string };
+      console.error('Error submitting student form:', error);
       
-      // Check if it's a duplicate student ID error
-      const err = error as { 
-        response?: { 
-          status?: number; 
-          data?: { 
-            message?: string 
-          } 
-        } 
-      };
+      // Show error notification
+      notifyCrudOperation(mode === 'add' ? 'create' : 'update', 'Student', 'error', error);
       
-      if (err.response && err.response.status === 400 && 
-          err.response.data?.message === "Student ID already exists") {
-        setErrors(prev => ({
-          ...prev,
-          studentId: 'Student ID already exists',
-          form: 'A student with this ID already exists.'
-        }));
-        
-        // Call the callback to inform parent component about existing student
-        if (onExistingStudent) {
-          onExistingStudent(formData.studentId as string);
-        }
-      } else {
-        // Generic error
-        setErrors(prev => ({
-          ...prev,
-          form: err.response?.data?.message || 'Failed to submit student. Please try again.'
-        }));
-      }
-    } finally {
+      setErrors(prev => ({
+        ...prev,
+        form: err.message || 'An unexpected error occurred. Please try again.'
+      }));
       setIsSubmitting(false);
     }
   };

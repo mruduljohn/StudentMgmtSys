@@ -44,6 +44,51 @@ export const updateConfig = async (req: Request, res: Response): Promise<void> =
       return;
     }
     
+    // Handle hostel renames specifically
+    if (category === "hostels") {
+      // Get the previous hostel names
+      const previousConfig = await Config.findOne({ category });
+      const previousHostels = previousConfig?.values || [];
+      const newHostels = values || [];
+      
+      // Check for renamed hostels - if a hostel is removed and a new one is added
+      // We need to update student records that reference the old hostel name
+      if (previousHostels.length > 0) {
+        // Import Student model only when needed to avoid circular dependencies
+        const Student = require("../models/student.model").default;
+        
+        // For each previous hostel that no longer exists, check if it needs to be updated
+        for (const oldHostel of previousHostels) {
+          if (!newHostels.includes(oldHostel)) {
+            // Find a potential rename (new hostel that's not in the previous list)
+            const possibleNewHostels = newHostels.filter((h: string) => !previousHostels.includes(h));
+            
+            if (possibleNewHostels.length === 1) {
+              // Only attempt auto-rename if exactly one new hostel was added
+              const newHostel = possibleNewHostels[0];
+              
+              // Update student records
+              await Student.updateMany(
+                { hostel: oldHostel },
+                { hostel: newHostel }
+              );
+              
+              console.log(`Hostel renamed: "${oldHostel}" → "${newHostel}". Updated student records.`);
+              
+              // Log hostel rename in audit
+              await Audit.create({
+                user: req.user.id,
+                action: "HOSTEL_RENAME",
+                entityType: "CONFIG",
+                details: { oldHostel, newHostel },
+                ipAddress: req.ip
+              });
+            }
+          }
+        }
+      }
+    }
+    
     // Find and update or create if not exists
     const config = await Config.findOneAndUpdate(
       { category },

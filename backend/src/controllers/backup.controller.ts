@@ -50,11 +50,8 @@ export const createBackup = async (req: Request, res: Response): Promise<void> =
       },
       data: {
         students,
-        users: users.map(user => {
-          // Remove sensitive information
-          const { password, ...rest } = user;
-          return rest;
-        }),
+        // Include full user data with password hashes to allow complete restoration
+        users,
         configs,
         hours,
       }

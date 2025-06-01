@@ -419,27 +419,29 @@ export const hoursToCSV = (hours: any[]): string => {
     const facultyNames = hour.faculties?.map((f: any) => f.name).join(', ') || '';
     const facultyCodes = hour.faculties?.map((f: any) => f.code).join(', ') || '';
     
+    // Structure the data in the same order as expected by the import function
     return {
-      'Batch': hour.batch,
       'Subject': hour.subject,
+      'Batch': hour.batch,
       'Chapter': hour.chapter,
       'Mode': hour.mode,
       'Class Teacher': hour.classTeacher,
-      'Faculty Code': facultyCodes,
-      'Faculty Name': facultyNames,
-      'Status': hour.chapterStatus,
-      'Exam Date': hour.date,
+      'Faculty1 Code': hour.faculties?.[0]?.code || '',
+      'Faculty1 Name': hour.faculties?.[0]?.name || '',
+      'Faculty2 Code': hour.faculties?.[1]?.code || '',
+      'Faculty2 Name': hour.faculties?.[1]?.name || '',
+      'Faculty3 Code': hour.faculties?.[2]?.code || '',
+      'Faculty3 Name': hour.faculties?.[2]?.name || '',
+      'Exam Date': hour.examDate,
       'Alloted Hours': hour.allotedHours,
       'Completed Hours': hour.completedHours,
       'Remaining Hours': hour.remainingHours,
-      'Average Marks': hour.averageMarksOfBatch,
-      'A+ Count': hour.numberOfAPlus,
-      'Remarks 1': hour.remarks1,
-      'Remarks 2': hour.remarks2,
-      'Flag 1': hour.flag1,
-      'Flag 2': hour.flag2,
-      'Created At': hour.createdAt,
-      'Updated At': hour.updatedAt
+      'Average Marks Of Batch': hour.averageMarksOfBatch,
+      'Number Of A Plus': hour.numberOfAPlus,
+      'Remarks1': hour.remarks1,
+      'Remarks2': hour.remarks2,
+      'Flag1': hour.flag1,
+      'Flag2': hour.flag2
     };
   }));
   

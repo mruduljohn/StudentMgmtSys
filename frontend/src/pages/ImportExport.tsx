@@ -133,8 +133,8 @@ const ImportExport: React.FC = () => {
       }
     } else if (exportType === 'hours') {
       // Security check - only allow admin to export hours data
-      if (!isAdmin) {
-        setUploadError('Only administrators can export hour data');
+      if (!isAdmin && authStore.user?.role !== 'MENTOR') {
+        setUploadError('Only administrators and mentors can export hour data');
         return;
       }
       
@@ -143,33 +143,42 @@ const ImportExport: React.FC = () => {
         hourStore.init();
       }
       
-      // Fetch all hours (not just current page) for export
-      hourStore.fetchHours();
-      
-      const hours = hourStore.getHours;
-      if (hours.length === 0) {
-        alert('No hours data to export');
-        return;
-      }
-      
-      try {
-        if (exportFormat === 'xlsx') {
-          const excelData = hoursToExcel(hours);
-          setExportData(excelData);
-          setIsFileNamePromptOpen(true);
-        } else if (exportFormat === 'csv') {
-          const csvData = hoursToCSV(hours);
-          setExportData(csvData);
-          setIsFileNamePromptOpen(true);
-        } else if (exportFormat === 'pdf') {
-          const pdfDoc = hoursToPDF(hours);
-          downloadPDF(pdfDoc, `hours-export-${new Date().toISOString().slice(0, 10)}.pdf`);
-          setUploadSuccess(`Successfully exported ${hours.length} hour records to PDF`);
+      // Fetch all hours for export without pagination constraints
+      const loadAllHours = async () => {
+        try {
+          setIsUploading(true);
+          // This will fetch all hours data without pagination
+          await hourStore.fetchHours();
+          
+          const hours = hourStore.getHours;
+          if (hours.length === 0) {
+            alert('No hours data to export');
+            setIsUploading(false);
+            return;
+          }
+          
+          if (exportFormat === 'xlsx') {
+            const excelData = hoursToExcel(hours);
+            setExportData(excelData);
+            setIsFileNamePromptOpen(true);
+          } else if (exportFormat === 'csv') {
+            const csvData = hoursToCSV(hours);
+            setExportData(csvData);
+            setIsFileNamePromptOpen(true);
+          } else if (exportFormat === 'pdf') {
+            const pdfDoc = hoursToPDF(hours);
+            downloadPDF(pdfDoc, `hours-export-${new Date().toISOString().slice(0, 10)}.pdf`);
+            setUploadSuccess(`Successfully exported ${hours.length} hour records to PDF`);
+          }
+        } catch (err) {
+          console.error('Error exporting hours data:', err);
+          alert('Failed to export hours data');
+        } finally {
+          setIsUploading(false);
         }
-      } catch (err) {
-        console.error('Error exporting hours data:', err);
-        alert('Failed to export hours data');
-      }
+      };
+      
+      loadAllHours();
     } else if (exportType === 'hourStats') {
       // Security check - only allow admin to export hour stats
       if (!isAdmin) {
@@ -562,7 +571,7 @@ const ImportExport: React.FC = () => {
               className="p-2 border rounded-md w-full mb-4"
             >
               <option value="students">Students Data</option>
-              {isAdmin && <option value="hours">Hours Data</option>}
+              {(isAdmin || authStore.user?.role === 'MENTOR') && <option value="hours">Hours Data</option>}
               {isAdmin && <option value="hourStats">Hour Statistics</option>}
             </select>
             
@@ -607,7 +616,7 @@ const ImportExport: React.FC = () => {
                 )}
               </>
             )}
-            {exportType === 'hours' && isAdmin && (
+            {exportType === 'hours' && (isAdmin || authStore.user?.role === 'MENTOR') && (
               <>
                 <p>Total hour records: {hourStore.getTotalHours}</p>
                 {hourStore.getTotalHours === 0 && (
