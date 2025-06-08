@@ -8,6 +8,7 @@ import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
 import { formatDate } from '../../utils/formatters';
 import { Plus, Trash2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 interface HourModalProps {
   open: boolean;
@@ -329,6 +330,8 @@ const HourModal: React.FC<HourModalProps> = ({
       };
       
       onSubmit(submissionData);
+    } else {
+      toast.error('Please fix the errors before submitting');
     }
   };
   

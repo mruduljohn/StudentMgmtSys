@@ -6,8 +6,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import { getFieldConfigs } from '../../utils/fieldConfig';
-import { notifyCrudOperation, showErrorToast, showSuccessToast } from '../../utils/toastUtils';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 interface StudentFormProps {
   student?: Student;
@@ -144,9 +143,9 @@ const StudentForm: React.FC<StudentFormProps> = ({
     if (!formData.name) newErrors.name = 'Name is required';
     if (!formData.studentId) newErrors.studentId = 'Student ID is required';
     
-    // Phone number validation - accept international formats up to 15 digits
-    if (formData.phoneNumber && !/^\+?\d{1,15}$/.test(formData.phoneNumber)) {
-      newErrors.phoneNumber = 'Enter a valid phone number (up to 15 digits, can include + prefix)';
+    // Phone number validation - allow up to 15 digits for international numbers
+    if (formData.phoneNumber && !/^\d{10,15}$/.test(formData.phoneNumber)) {
+      newErrors.phoneNumber = 'Enter a valid phone number (10-15 digits)';
     }
     
     // Custom field validations
@@ -173,9 +172,27 @@ const StudentForm: React.FC<StudentFormProps> = ({
       return value;
     }
     
-    // Map hostel values - handle case variations
+    // Map hostel values - normalize DAY SCHOLAR to DS
     if (field === 'hostel') {
-      if (value === 'DAY SCHOLAR' || value.toUpperCase() === 'DAY SCHOLAR') return 'DS';
+      if (value === 'DAY SCHOLAR') return 'DS';
+      return value;
+    }
+    
+    return value;
+  };
+  
+  // Add a function to map backend values to display values
+  const getDisplayValueFromBackend = (field: string, value: string): string => {
+    // Map gender values
+    if (field === 'gender') {
+      if (value === 'M') return 'MALE';
+      if (value === 'F') return 'FEMALE';
+      return value;
+    }
+    
+    // Map hostel values - normalize DS to DAY SCHOLAR for display
+    if (field === 'hostel') {
+      if (value === 'DS') return 'DAY SCHOLAR';
       return value;
     }
     
@@ -219,6 +236,8 @@ const StudentForm: React.FC<StudentFormProps> = ({
                 form: 'A student with this ID already exists.'
               }));
               
+              toast.error('Student ID already exists');
+              
               // Call the callback to inform parent component about existing student
               if (onExistingStudent) {
                 onExistingStudent(formData.studentId as string);
@@ -236,6 +255,9 @@ const StudentForm: React.FC<StudentFormProps> = ({
                 ...prev,
                 form: 'Error checking student existence. Please try again.'
               }));
+              
+              toast.error('Error checking student existence. Please try again.');
+              
               setIsSubmitting(false);
               return;
             }
@@ -243,51 +265,66 @@ const StudentForm: React.FC<StudentFormProps> = ({
           }
         }
         
-        // Show loading notification
-        const loadingToast = notifyCrudOperation('create', 'Student', 'loading');
-        
         // If we get here, the student ID doesn't exist yet, so proceed with adding
         await addStudent(submissionData);
-        
-        // Dismiss loading notification and show success
-        toast.dismiss(loadingToast);
-        notifyCrudOperation('create', 'Student', 'success');
-        
         setSuccessMessage('Student added successfully!');
+        toast.success('Student added successfully!');
         
         // Wait for 1.5 seconds to show the success message, then close the form
         setTimeout(() => {
           onClose();
         }, 1500);
-      } else if (mode === 'edit' && student?._id) {
-        // Show loading notification
-        const loadingToast = notifyCrudOperation('update', 'Student', 'loading');
-        
+      } else {
         // Update existing student
-        await updateStudent(student._id, submissionData);
-        
-        // Dismiss loading and show success
-        toast.dismiss(loadingToast);
-        notifyCrudOperation('update', 'Student', 'success');
-        
-        setSuccessMessage('Student updated successfully!');
-        
-        // Wait for 1.5 seconds to show the success message, then close the form
-        setTimeout(() => {
-          onClose();
-        }, 1500);
+        if (student?.studentId) {
+          await updateStudent(student.studentId, submissionData);
+          setSuccessMessage('Student updated successfully!');
+          toast.success('Student updated successfully!');
+          
+          // Wait for 1.5 seconds to show the success message, then close the form
+          setTimeout(() => {
+            onClose();
+          }, 1500);
+        }
       }
-    } catch (error: unknown) {
-      const err = error as { message?: string };
-      console.error('Error submitting student form:', error);
+    } catch (err: unknown) {
+      console.error('Error submitting student form:', err);
       
-      // Show error notification
-      notifyCrudOperation(mode === 'add' ? 'create' : 'update', 'Student', 'error', error);
+      // Cast to a type that might have response data
+      const error = err as {
+        response?: {
+          status?: number;
+          data?: {
+            message?: string;
+          };
+        };
+      };
       
-      setErrors(prev => ({
-        ...prev,
-        form: err.message || 'An unexpected error occurred. Please try again.'
-      }));
+      if (error.response && error.response.status === 400 && 
+          error.response.data?.message === "Student ID already exists") {
+        setErrors(prev => ({
+          ...prev,
+          studentId: 'Student ID already exists',
+          form: 'A student with this ID already exists.'
+        }));
+        
+        toast.error('Student ID already exists');
+        
+        // Call the callback to inform parent component about existing student
+        if (onExistingStudent) {
+          onExistingStudent(formData.studentId as string);
+        }
+      } else {
+        // Generic error
+        const errorMessage = error.response?.data?.message || 'Failed to submit student. Please try again.';
+        setErrors(prev => ({
+          ...prev,
+          form: errorMessage
+        }));
+        
+        toast.error(errorMessage);
+      }
+    } finally {
       setIsSubmitting(false);
     }
   };

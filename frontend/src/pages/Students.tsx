@@ -18,6 +18,7 @@ import { studentsToExcel, downloadExcel, studentsToCSV, studentsToPDF, downloadC
 import PasswordConfirmModal from '../components/ui/PasswordConfirmModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import FileNamePrompt from '../components/ui/FileNamePrompt';
+import { toast, Toaster } from 'react-hot-toast';
 
 // Define types for bulk actions and sort options
 // interface BulkAction {
@@ -328,36 +329,49 @@ const Students: React.FC = observer(() => {
   }
   
   const confirmDelete = async () => {
-    if (selectedStudent) {
-      try {
-        console.log(`Confirming delete for student: ${selectedStudent.name} (${selectedStudent.studentId})`);
-        await studentStore.deleteStudent(selectedStudent.studentId);
-        setIsDeleteModalOpen(false);
-        // Refresh the student list after deletion
-        // No need to call fetchStudents since the store already updates
-      } catch (error) {
-        console.error("Error deleting student:", error);
-        alert("Failed to delete student. Please try again.");
-      }
+    if (!selectedStudent) return;
+    
+    try {
+      await studentStore.deleteStudent(selectedStudent.studentId);
+      setIsDeleteModalOpen(false);
+      setIsPasswordModalOpen(false);
+      
+      // Show success message
+      showSuccessMessage(`Student ${selectedStudent.name} deleted successfully`);
+      toast.success(`Student deleted successfully`);
+      
+      // Reset selected student
+      setSelectedStudent(null);
+    } catch (error) {
+      console.error('Error deleting student:', error);
+      showErrorMessage('Failed to delete student');
+      toast.error('Failed to delete student');
     }
   };
   
   const handleBulkDelete = async () => {
-    // Open password confirmation modal instead of confirming directly
     setDeleteAction('bulk');
     setIsPasswordModalOpen(true);
   };
   
   const confirmBulkDelete = async () => {
     try {
-      console.log(`Bulk deleting ${selectedRows.length} students`);
-        // Use Promise.all to wait for all delete operations to complete
-        await Promise.all(selectedRows.map(id => studentStore.deleteStudent(id)));
-        setSelectedRows([]);
-      // No need to call fetchStudents since the store already updates
-      } catch (error) {
-        console.error("Error deleting students:", error);
-        alert("Failed to delete some students. Please try again.");
+      // Delete each selected student
+      for (const studentId of selectedRows) {
+        await studentStore.deleteStudent(studentId);
+      }
+      
+      // Show success message
+      showSuccessMessage(`${selectedRows.length} students deleted successfully`);
+      toast.success(`${selectedRows.length} students deleted successfully`);
+      
+      // Reset selected rows
+      setSelectedRows([]);
+      setIsPasswordModalOpen(false);
+    } catch (error) {
+      console.error('Error deleting students:', error);
+      showErrorMessage('Failed to delete students');
+      toast.error('Failed to delete students');
     }
   };
   
@@ -905,22 +919,28 @@ const Students: React.FC = observer(() => {
       if (exportFormat === 'xlsx') {
         downloadExcel(exportData as ArrayBuffer, `${filename}.xlsx`);
         showSuccessMessage(`Exported ${exportType === 'all' ? 'all' : exportType === 'filtered' ? 'filtered' : 'selected'} students to ${filename}.xlsx`);
+        toast.success(`Export completed successfully`);
       } else if (exportFormat === 'csv') {
         downloadCSV(exportData as string, `${filename}.csv`);
         showSuccessMessage(`Exported ${exportType === 'all' ? 'all' : exportType === 'filtered' ? 'filtered' : 'selected'} students to ${filename}.csv`);
+        toast.success(`Export completed successfully`);
       } else if (exportFormat === 'pdf') {
         downloadPDF(exportData as any, `${filename}.pdf`);
         showSuccessMessage(`Exported ${exportType === 'all' ? 'all' : exportType === 'filtered' ? 'filtered' : 'selected'} students to ${filename}.pdf`);
+        toast.success(`Export completed successfully`);
       }
     } catch (err) {
       console.error('Error downloading file:', err);
       showErrorMessage('Failed to download file');
+      toast.error('Failed to download file');
     }
   };
   
   return (
     <Layout title="Students">
       <div className="flex flex-col h-full">
+        <Toaster position="top-right" />
+        
         {/* Success and Error Messages */}
         {successMessage && (
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-600">

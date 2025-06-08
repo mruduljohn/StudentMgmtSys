@@ -153,6 +153,7 @@ const Analytics: React.FC = observer(() => {
       joinedStudents.forEach(student => {
         if (!student.hostel) return;
         
+        // Normalize hostel names - always use 'DAY SCHOLAR' for display in analytics
         const hostelName = student.hostel === 'DS' ? 'DAY SCHOLAR' : student.hostel;
         
         if (!hostelMap.has(hostelName)) {
@@ -175,23 +176,8 @@ const Analytics: React.FC = observer(() => {
       joinedStudents.forEach(student => {
         if (!student.hostel || !student.batch) return;
         
+        // Normalize hostel names consistently
         const hostelName = student.hostel === 'DS' ? 'DAY SCHOLAR' : student.hostel;
-        
-        if (!hostelMap.has(hostelName)) {
-          // Handle hostels not in the predefined list (shouldn't happen now with the code above)
-          const batchCounts: Record<string, number> = {};
-          batchesSet.forEach(batch => {
-            batchCounts[batch as string] = 0;
-          });
-          
-          hostelMap.set(hostelName, {
-            hostel: hostelName,
-            totalCapacity: 0, // Unknown capacity
-            filled: 0,
-            vacancy: 0,
-            batches: batchCounts,
-          });
-        }
         
         const summary = hostelMap.get(hostelName)!;
         summary.filled++;

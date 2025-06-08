@@ -9,7 +9,7 @@ import HourStats from '../components/hours/HourStats';
 import ChapterStatus from '../components/hours/ChapterStatus';
 import HourFilters from '../components/hours/HourFilters';
 import Button from '../components/ui/Button';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import { 
   hoursToExcel, downloadExcel, hoursToCSV, downloadCSV, hoursToPDF, downloadPDF, 
   hourStatsToExcel, hourStatsToCSV, hourStatsToPDF,
@@ -299,33 +299,26 @@ const HourDashboard: React.FC = observer(() => {
   
   // Handle actual export with the chosen filename
   const handleExportWithFilename = (filename: string) => {
+    if (!exportData) return;
+    
     try {
-      // Use the prepared export data based on format
-      switch (exportFormat) {
-        case 'xlsx':
-          downloadExcel(exportData as ArrayBuffer, `${filename}.xlsx`);
-          break;
-        case 'csv':
-          downloadCSV(exportData as string, `${filename}.csv`);
-          break;
-        case 'pdf':
-          downloadPDF(exportData as jsPDF, `${filename}.pdf`);
-          break;
-      }
-      
-      // Show success message based on current tab
       let successMessage = '';
-      if (tabValue === 0) {
-        successMessage = `Successfully exported ${hourStore.getHours.length} hour records`;
-      } else if (tabValue === 1) {
-        successMessage = 'Successfully exported hour statistics';
-      } else {
-        successMessage = 'Successfully exported chapter status data';
+      
+      if (exportFormat === 'xlsx') {
+        downloadExcel(exportData as ArrayBuffer, `${filename}.xlsx`);
+        successMessage = `Successfully exported to ${filename}.xlsx`;
+      } else if (exportFormat === 'csv') {
+        downloadCSV(exportData as string, `${filename}.csv`);
+        successMessage = `Successfully exported to ${filename}.csv`;
+      } else if (exportFormat === 'pdf') {
+        downloadPDF(exportData as jsPDF, `${filename}.pdf`);
+        successMessage = `Successfully exported to ${filename}.pdf`;
       }
       
       toast.success(successMessage);
-    } catch (err) {
-      console.error('Error exporting data:', err);
+      setIsFileNamePromptOpen(false);
+    } catch (error) {
+      console.error('Error exporting data:', error);
       toast.error('Failed to export data');
     }
   };
@@ -341,150 +334,145 @@ const HourDashboard: React.FC = observer(() => {
   }
 
   return (
-    <Layout>
-      {/* Live clock display */}
-      <div className="mb-4 bg-gray-100 p-3 rounded-lg shadow-sm">
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="font-bold">Current Date:</span> {formattedDate}
-          </div>
-          <div>
-            <span className="font-bold">Current Time:</span> {formattedTime}
+    <Layout title="Hour Dashboard">
+      <Toaster position="top-right" />
+      <div className="p-4">
+        {/* Header section with clock and tabs */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+          <div className="flex items-center mb-4 md:mb-0">
+            <Clock className="h-6 w-6 mr-2 text-blue-600" />
+            <div>
+              <div className="text-lg font-semibold">{formattedTime}</div>
+              <div className="text-sm text-gray-500">{formattedDate}</div>
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Hour Dashboard</h1>
-        <p className="text-gray-600">
-          Track and manage teaching hours
-        </p>
-      </div>
-      
-      <div className="bg-white rounded-lg shadow-md mb-6">
-        {/* Tabs and Export Button */}
-        <div className="border-b border-gray-200 flex justify-between">
-          <div className="flex">
-            <button
-              className={`flex items-center px-4 py-3 text-sm font-medium ${
-                tabValue === 0
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => handleTabChange(0)}
-            >
-              <Clock className="h-5 w-5 mr-2" />
-              Hour Entries
-            </button>
-            <button
-              className={`flex items-center px-4 py-3 text-sm font-medium ${
-                tabValue === 1
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => handleTabChange(1)}
-            >
-              <BarChart2 className="h-5 w-5 mr-2" />
-              Statistics
-            </button>
-            <button
-              className={`flex items-center px-4 py-3 text-sm font-medium ${
-                tabValue === 2
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => handleTabChange(2)}
-            >
-              <BookOpen className="h-5 w-5 mr-2" />
-              Chapter Status
-            </button>
+        
+        <div className="bg-white rounded-lg shadow-md mb-6">
+          {/* Tabs and Export Button */}
+          <div className="border-b border-gray-200 flex justify-between">
+            <div className="flex">
+              <button
+                className={`flex items-center px-4 py-3 text-sm font-medium ${
+                  tabValue === 0
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                onClick={() => handleTabChange(0)}
+              >
+                <Clock className="h-5 w-5 mr-2" />
+                Hour Entries
+              </button>
+              <button
+                className={`flex items-center px-4 py-3 text-sm font-medium ${
+                  tabValue === 1
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                onClick={() => handleTabChange(1)}
+              >
+                <BarChart2 className="h-5 w-5 mr-2" />
+                Statistics
+              </button>
+              <button
+                className={`flex items-center px-4 py-3 text-sm font-medium ${
+                  tabValue === 2
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                onClick={() => handleTabChange(2)}
+              >
+                <BookOpen className="h-5 w-5 mr-2" />
+                Chapter Status
+              </button>
+            </div>
+            
+            {/* Export Button with Dropdown - Admin Only */}
+            {isAdmin && (
+              <div className="px-4 py-2 flex items-center relative">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                  className="flex items-center"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+                
+                {isExportMenuOpen && (
+                  <Menu
+                    items={[
+                      { label: 'Excel (.xlsx)', onClick: () => handleExportFormat('xlsx') },
+                      { label: 'CSV (.csv)', onClick: () => handleExportFormat('csv') },
+                      { label: 'PDF (.pdf)', onClick: () => handleExportFormat('pdf') }
+                    ]}
+                    onClose={() => setIsExportMenuOpen(false)}
+                    className="right-0 mt-2"
+                  />
+                )}
+              </div>
+            )}
           </div>
           
-          {/* Export Button with Dropdown - Admin Only */}
-          {isAdmin && (
-            <div className="px-4 py-2 flex items-center relative">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-                className="flex items-center"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-              
-              {isExportMenuOpen && (
-                <Menu
-                  items={[
-                    { label: 'Excel (.xlsx)', onClick: () => handleExportFormat('xlsx') },
-                    { label: 'CSV (.csv)', onClick: () => handleExportFormat('csv') },
-                    { label: 'PDF (.pdf)', onClick: () => handleExportFormat('pdf') }
-                  ]}
-                  onClose={() => setIsExportMenuOpen(false)}
-                  className="right-0 mt-2"
-                />
-              )}
+          {/* Filters Section */}
+          <div className="mb-6">
+            <HourFilters
+              batches={hourStore.getOptions.batches}
+              subjects={hourStore.getOptions.subjects}
+              modes={hourStore.getOptions.modes}
+              classTeachers={hourStore.getOptions.classTeachers}
+              selectedBatch={selectedBatch}
+              selectedSubject={selectedSubject}
+              selectedMode={selectedMode}
+              selectedTeacher={selectedTeacher}
+              selectedStatus={selectedStatus}
+              chapterSearchQuery={chapterSearchQuery}
+              onBatchChange={handleBatchChange}
+              onSubjectChange={handleSubjectChange}
+              onModeChange={handleModeChange}
+              onTeacherChange={handleTeacherChange}
+              onStatusChange={handleStatusChange}
+              onChapterSearch={handleChapterSearch}
+              loading={hourStore.isLoading}
+              totalResults={hourStore.getTotalHours}
+            />
+          </div>
+          
+          {/* Error message */}
+          {hourStore.getError && (
+            <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg">
+              {hourStore.getError}
             </div>
           )}
+          
+          {/* Tab panels */}
+          <TabPanel value={tabValue} index={0}>
+            <HourList />
+          </TabPanel>
+          
+          <TabPanel value={tabValue} index={1}>
+            <HourStats />
+          </TabPanel>
+          
+          <TabPanel value={tabValue} index={2}>
+            <ChapterStatus 
+              batch={selectedBatch} 
+              subject={selectedSubject} 
+            />
+          </TabPanel>
         </div>
         
-        {/* Filters Section */}
-        <div className="mb-6">
-          <HourFilters
-            batches={hourStore.getOptions.batches}
-            subjects={hourStore.getOptions.subjects}
-            modes={hourStore.getOptions.modes}
-            classTeachers={hourStore.getOptions.classTeachers}
-            selectedBatch={selectedBatch}
-            selectedSubject={selectedSubject}
-            selectedMode={selectedMode}
-            selectedTeacher={selectedTeacher}
-            selectedStatus={selectedStatus}
-            chapterSearchQuery={chapterSearchQuery}
-            onBatchChange={handleBatchChange}
-            onSubjectChange={handleSubjectChange}
-            onModeChange={handleModeChange}
-            onTeacherChange={handleTeacherChange}
-            onStatusChange={handleStatusChange}
-            onChapterSearch={handleChapterSearch}
-            loading={hourStore.isLoading}
-            totalResults={hourStore.getTotalHours}
-          />
-        </div>
-        
-        {/* Error message */}
-        {hourStore.getError && (
-          <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg">
-            {hourStore.getError}
-          </div>
-        )}
-        
-        {/* Tab panels */}
-        <TabPanel value={tabValue} index={0}>
-          <HourList />
-        </TabPanel>
-        
-        <TabPanel value={tabValue} index={1}>
-          <HourStats />
-        </TabPanel>
-        
-        <TabPanel value={tabValue} index={2}>
-          <ChapterStatus 
-            batch={selectedBatch} 
-            subject={selectedSubject} 
-          />
-        </TabPanel>
+        {/* Filename Prompt */}
+        <FileNamePrompt
+          isOpen={isFileNamePromptOpen}
+          onClose={() => setIsFileNamePromptOpen(false)}
+          onConfirm={handleExportWithFilename}
+          defaultFileName={`hours-${tabValue === 0 ? 'data' : tabValue === 1 ? 'stats' : 'chapters'}-${new Date().toISOString().slice(0, 10)}`}
+          title={`Export ${tabValue === 0 ? 'Hour Entries' : tabValue === 1 ? 'Statistics' : 'Chapter Status'}`}
+          fileType={exportFormat === 'xlsx' ? 'Excel (.xlsx)' : exportFormat === 'csv' ? 'CSV' : 'PDF'}
+        />
       </div>
-      
-      {/* Filename Prompt */}
-      <FileNamePrompt
-        isOpen={isFileNamePromptOpen}
-        onClose={() => setIsFileNamePromptOpen(false)}
-        onConfirm={handleExportWithFilename}
-        defaultFileName={`hours-${tabValue === 0 ? 'data' : tabValue === 1 ? 'stats' : 'chapters'}-${new Date().toISOString().slice(0, 10)}`}
-        title={`Export ${tabValue === 0 ? 'Hour Entries' : tabValue === 1 ? 'Statistics' : 'Chapter Status'}`}
-        fileType={exportFormat === 'xlsx' ? 'Excel (.xlsx)' : exportFormat === 'csv' ? 'CSV' : 'PDF'}
-      />
     </Layout>
   );
 });

@@ -300,7 +300,8 @@ const Settings: React.FC = () => {
       // Handle special case for hostels to extract capacities
       if (field === 'hostels') {
         const hostels: string[] = [];
-        const hostelCapacity: Record<string, number> = { ...prev.hostelCapacity };
+        const newHostelCapacity: Record<string, number> = {};
+        const oldHostels = new Set(prev.hostels);
         
         values.forEach(hostelEntry => {
           // Check if the entry has capacity info (format: "Hostel Name,42")
@@ -312,7 +313,7 @@ const Settings: React.FC = () => {
             
             if (!isNaN(capacity) && capacity >= 0) {
               hostels.push(hostelName);
-              hostelCapacity[hostelName] = capacity;
+              newHostelCapacity[hostelName] = capacity;
             } else {
               hostels.push(hostelEntry); // Keep the original format if number parsing fails
               // Show a toast notification if an invalid capacity is entered
@@ -321,14 +322,20 @@ const Settings: React.FC = () => {
               }
             }
           } else {
-            hostels.push(hostelEntry);
+            const hostelName = hostelEntry.trim();
+            hostels.push(hostelName);
+            
+            // If this hostel already exists in the previous config, preserve its capacity
+            if (prev.hostelCapacity[hostelName] !== undefined) {
+              newHostelCapacity[hostelName] = prev.hostelCapacity[hostelName];
+            }
           }
         });
         
         return {
           ...prev,
           hostels,
-          hostelCapacity,
+          hostelCapacity: newHostelCapacity, // Use the new clean hostelCapacity object
         };
       }
       

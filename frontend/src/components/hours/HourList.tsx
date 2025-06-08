@@ -13,7 +13,7 @@ import {
   hoursToTransposedExcel, hoursToTransposedCSV, hoursToTransposedPDF
 } from '../../utils/excelUtils';
 import FileNamePrompt from '../ui/FileNamePrompt';
-import { notifyCrudOperation, showErrorToast, showSuccessToast } from '../../utils/toastUtils';
+import toast from 'react-hot-toast';
 import Menu from '../ui/Menu';
 import SampleHourCSV from './SampleHourCSV';
 
@@ -44,7 +44,7 @@ const HourList: React.FC = observer(() => {
       setSelectedHours([]);
     } catch (error) {
       console.error('Error changing page:', error);
-      showErrorToast('An error occurred while changing page');
+      toast.error('An error occurred while changing page');
     }
   };
 
@@ -57,7 +57,7 @@ const HourList: React.FC = observer(() => {
       setSelectedHours([]);
     } catch (error) {
       console.error('Error changing rows per page:', error);
-      showErrorToast('An error occurred while changing rows per page');
+      toast.error('An error occurred while changing rows per page');
     }
   };
 
@@ -70,7 +70,7 @@ const HourList: React.FC = observer(() => {
       setSelectedHours([]);
     } catch (error) {
       console.error('Error sorting hours:', error);
-      showErrorToast('An error occurred while sorting');
+      toast.error('An error occurred while sorting');
     }
   };
 
@@ -194,12 +194,12 @@ const HourList: React.FC = observer(() => {
       for (const hourId of selectedHours) {
         await hourStore.deleteHour(hourId);
       }
-      showSuccessToast(`Successfully deleted ${selectedHours.length} hours`);
+      toast.success(`Successfully deleted ${selectedHours.length} hours`);
       setSelectedHours([]);
       setIsBulkDeleteDialogOpen(false);
     } catch (error) {
       console.error('Error deleting hours:', error);
-      showErrorToast('An error occurred while deleting hours');
+      toast.error('An error occurred while deleting hours');
     }
   };
 
@@ -224,7 +224,7 @@ const HourList: React.FC = observer(() => {
         : hourStore.getHours;
 
       if (hours.length === 0) {
-        showErrorToast('No hours data to export');
+        toast.error('No hours data to export');
         return;
       }
       
@@ -243,10 +243,10 @@ const HourList: React.FC = observer(() => {
           break;
       }
       
-      showSuccessToast(`Successfully exported ${hours.length} hour records`);
+      toast.success(`Successfully exported ${hours.length} hour records`);
     } catch (err) {
       console.error('Error exporting data:', err);
-      showErrorToast('Failed to export data');
+      toast.error('Failed to export data');
     }
   };
 
@@ -264,20 +264,20 @@ const HourList: React.FC = observer(() => {
 
   const handleUploadCSV = async () => {
     if (!csvFile) {
-      showErrorToast('Please select a CSV file');
+      toast.error('Please select a CSV file');
       return;
     }
 
     try {
       await hourStore.uploadHoursCSV(csvFile, uploadMode);
-      showSuccessToast('CSV file uploaded successfully');
+      toast.success('CSV file uploaded successfully');
       setCsvFile(null);
       setIsUploadModalOpen(false);
       // Refresh hours data
       await hourStore.fetchHours();
     } catch (error) {
       console.error('Error uploading CSV:', error);
-      showErrorToast('Failed to upload CSV file');
+      toast.error('Failed to upload CSV file');
     }
   };
 
@@ -295,7 +295,7 @@ const HourList: React.FC = observer(() => {
       const unselectedHours = hourStore.getHours.filter(h => !selectedHours.includes(h._id as string));
 
       if (unselectedHours.length === 0) {
-        showErrorToast('No unselected hours to export');
+        toast.error('No unselected hours to export');
         return;
       }
       
@@ -318,10 +318,10 @@ const HourList: React.FC = observer(() => {
           break;
       }
       
-      showSuccessToast(`Successfully exported ${unselectedHours.length} unselected hour records`);
+      toast.success(`Successfully exported ${unselectedHours.length} unselected hour records`);
     } catch (err) {
       console.error('Error exporting unselected data:', err);
-      showErrorToast('Failed to export unselected data');
+      toast.error('Failed to export unselected data');
     }
   };
 
